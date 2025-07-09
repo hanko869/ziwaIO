@@ -1,34 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUser } from '@/utils/auth';
 import { getAllUsers, createUser } from '@/utils/userDb';
+import { creditService } from '@/lib/credits';
 
-// GET all users
-export async function GET() {
-  const user = await getUser();
-  
-  if (!user || user.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+export async function GET(request: NextRequest) {
   try {
+    // Get all users
     const users = await getAllUsers();
-    // Remove password from response
-    const sanitizedUsers = users.map(({ password, ...rest }) => rest);
-    return NextResponse.json(sanitizedUsers);
+    
+    // Enhance user data with credit balance
+    const enhancedUsers = await Promise.all(
+      users.map(async (user) => {
+        const credits = await creditService.getUserCredits(user.id);
+        return {
+          ...user,
+          balance: credits?.balance || 0,
+          total_extractions: credits?.totalUsed || 0
+        };
+      })
+    );
+
+    return NextResponse.json(enhancedUsers);
   } catch (error) {
     console.error('Error fetching users:', error);
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
-// POST create new user
 export async function POST(request: NextRequest) {
-  const user = await getUser();
-  
-  if (!user || user.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
     const { username, password, role } = await request.json();
 
@@ -39,23 +40,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (role && !['admin', 'user'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Invalid role. Must be either admin or user' },
-        { status: 400 }
-      );
-    }
+    const user = await createUser(username, password, role);
+    
+    // Initialize credits for new user
+    await creditService.initializeUserCredits(user.id);
 
-    const newUser = await createUser(username, password, role || 'user');
-    const { password: _, ...sanitizedUser } = newUser;
-    
-    return NextResponse.json(sanitizedUser, { status: 201 });
+    return NextResponse.json(user);
   } catch (error: any) {
-    if (error.message === 'Username already exists') {
-      return NextResponse.json({ error: error.message }, { status: 409 });
-    }
-    
     console.error('Error creating user:', error);
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Failed to create user' },
+      { status: 400 }
+    );
   }
 } 
