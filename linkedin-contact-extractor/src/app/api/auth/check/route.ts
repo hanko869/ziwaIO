@@ -1,24 +1,32 @@
-import { NextResponse } from 'next/server';
-import { getUser } from '@/utils/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
 
-export async function GET() {
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+export async function GET(request: NextRequest) {
   try {
-    const user = await getUser();
+    const token = request.cookies.get('auth-token')?.value;
     
-    if (!user) {
-      return NextResponse.json({ authenticated: false });
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      );
     }
 
-    return NextResponse.json({ 
-      authenticated: true, 
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role
-      }
+    // Verify and decode the token
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    
+    return NextResponse.json({
+      id: decoded.userId,
+      email: decoded.email,
+      username: decoded.email.split('@')[0],
+      role: decoded.role || 'user'
     });
   } catch (error) {
-    console.error('Auth check error:', error);
-    return NextResponse.json({ authenticated: false });
+    return NextResponse.json(
+      { error: 'Invalid token' },
+      { status: 401 }
+    );
   }
 } 

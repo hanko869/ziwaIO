@@ -96,21 +96,27 @@ export async function POST(request: NextRequest) {
     if (payment_status === 'finished' || payment_status === 'confirmed' || payment_status === 'sending') {
       // Payment confirmed
       try {
-        await creditService.updatePaymentStatus(payment_id, 'confirmed');
-        
         // Add credits to user
-        const creditsToAdd = Math.floor(parseFloat(price_amount) * 30); // 30 credits per USDT
+        const success = await creditService.addCreditsFromPayment(
+          userId,
+          parseFloat(price_amount),
+          payment_id,
+          payment_id // Using payment_id as transaction hash for NOWPayments
+        );
         
-        // For testing, just log the credit addition
-        console.log(`Adding ${creditsToAdd} credits to user ${userId}`);
-        
-        // In production, you would actually add credits to the user's balance
-        // await creditService.addCredits(userId, creditsToAdd);
-        
-        return NextResponse.json({ 
-          success: true,
-          message: 'Payment processed successfully'
-        });
+        if (success) {
+          console.log(`Successfully added credits to user ${userId} for payment ${payment_id}`);
+          return NextResponse.json({ 
+            success: true,
+            message: 'Payment processed successfully'
+          });
+        } else {
+          console.error('Failed to add credits to user');
+          return NextResponse.json({ 
+            success: false,
+            error: 'Failed to add credits'
+          }, { status: 500 });
+        }
       } catch (error) {
         console.error('Error processing payment:', error);
         return NextResponse.json({ 

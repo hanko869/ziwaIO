@@ -6,9 +6,11 @@ import { isValidLinkedInUrl, extractContactFromLinkedIn, checkAPIConfiguration }
 import { saveContact, getStoredContacts, clearStoredContacts } from '@/utils/storage';
 import { generateCSV, downloadCSV } from '@/utils/csv';
 import { useLanguage, interpolate } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ContactExtractorSubscription: React.FC = () => {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -18,7 +20,6 @@ const ContactExtractorSubscription: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [creditBalance, setCreditBalance] = useState(100);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
 
   // Configuration constants
   const MAX_BULK_URLS = 500; // Increased from 100, max API limit is 2500
@@ -33,14 +34,24 @@ const ContactExtractorSubscription: React.FC = () => {
       setApiConfigured(configured);
     });
     
-    // Get or create user ID from localStorage
-    let storedUserId = localStorage.getItem('subscription_user_id');
-    if (!storedUserId) {
-      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('subscription_user_id', storedUserId);
-    }
-    setUserId(storedUserId);
+    // Fetch user's credit balance
+    fetchCreditBalance();
   }, []);
+
+  const fetchCreditBalance = async () => {
+    try {
+      const response = await fetch('/api/credits/balance', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCreditBalance(data.balance);
+      }
+    } catch (error) {
+      console.error('Failed to fetch credit balance:', error);
+    }
+  };
 
   const showFeedback = (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
     setFeedback({ type, message });
@@ -50,7 +61,8 @@ const ContactExtractorSubscription: React.FC = () => {
   const handlePaymentComplete = async () => {
     setShowPaymentModal(false);
     // Refresh credit balance
-    setCreditBalance(prev => prev + 300); // For demo, add 300 credits
+    await fetchCreditBalance();
+    showFeedback('success', 'Payment successful! Credits have been added to your account.');
   };
 
   const handleExtractContact = async () => {
@@ -87,6 +99,9 @@ const ContactExtractorSubscription: React.FC = () => {
         saveContact(result.contact);
         setContacts(getStoredContacts());
         setLinkedinUrl('');
+        
+        // Refresh credit balance after extraction
+        await fetchCreditBalance();
         
         const emailCount = result.contact.emails?.length || (result.contact.email ? 1 : 0);
         const phoneCount = result.contact.phones?.length || (result.contact.phone ? 1 : 0);
@@ -588,7 +603,7 @@ const ContactExtractorSubscription: React.FC = () => {
                           <div className="flex items-center gap-2 text-gray-600">
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                             <span>{contact.location}</span>
                           </div>
@@ -643,7 +658,7 @@ const ContactExtractorSubscription: React.FC = () => {
       {/* Payment Modal */}
       {showPaymentModal && (
         <PaymentModal 
-          userId={userId!} 
+          userId={user?.id || ''} 
           onClose={() => setShowPaymentModal(false)}
           onPaymentComplete={handlePaymentComplete}
         />
