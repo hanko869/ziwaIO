@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "cookies-next": "^6.0.0",
+    "i18next": "^25.3.1",
+    "jose": "^6.0.11",
+    "react-i18next": "^15.6.0"
+  }
+}
