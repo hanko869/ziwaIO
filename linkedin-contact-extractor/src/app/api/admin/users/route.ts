@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { username, password, role } = await request.json();
+    console.log('Creating user:', { username, role });
 
     if (!username || !password) {
       return NextResponse.json(
@@ -41,13 +42,16 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await createUser(username, password, role);
+    console.log('User created successfully:', user.id);
     
     // Initialize credits for new user
     await creditService.initializeUserCredits(user.id);
+    console.log('Credits initialized for user:', user.id);
 
     return NextResponse.json(user);
   } catch (error: any) {
     console.error('Error creating user:', error);
+    console.error('Error stack:', error.stack);
     return NextResponse.json(
       { error: error.message || 'Failed to create user' },
       { status: 400 }

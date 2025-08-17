@@ -56,10 +56,12 @@ export default function UserManagement() {
         setNewUser({ username: '', password: '', role: 'user' });
         fetchUsers();
       } else {
-        const error = await response.json();
-        alert(error.message || 'Failed to create user');
+        const errorData = await response.json();
+        console.error('Create user error:', errorData);
+        alert(errorData.error || errorData.message || 'Failed to create user');
       }
     } catch (error) {
+      console.error('Create user exception:', error);
       alert('Failed to create user');
     }
   };

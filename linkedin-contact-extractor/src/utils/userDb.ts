@@ -51,6 +51,7 @@ export const createUser = async (username: string, password: string, role: 'admi
     .from('users')
     .insert({
       username: username.toLowerCase(),
+      email: `${username.toLowerCase()}@example.com`, // Generate a default email
       password_hash: hashedPassword,
       role,
       is_active: true
