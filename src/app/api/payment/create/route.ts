@@ -53,8 +53,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create invoice-payment with NOWPayments (for hosted checkout with proper fee handling)
+    // Add 5% markup to cover all fees when user should pay them
+    const amountWithFees = parseFloat((amount * 1.05).toFixed(2));
+    console.log(`Original amount: ${amount}, Amount with fees: ${amountWithFees}`);
+    
     const invoiceData = {
-      price_amount: amount,
+      price_amount: amountWithFees,
       price_currency: 'usd',
       order_id: `${userId || 'user'}_${Date.now()}`,
       order_description: `Deposit ${amount} USDT for ${amount * 30} credits`,
@@ -68,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating invoice-payment with NOWPayments:', invoiceData);
 
-    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice-payment`, {
+    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
       method: 'POST',
       headers: {
         'x-api-key': NOWPAYMENTS_API_KEY,
