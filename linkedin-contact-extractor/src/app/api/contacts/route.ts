@@ -4,11 +4,21 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Only create client if both values exist (prevents build errors)
+let supabase: any = null;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+}
 
 // Save extracted contact
 export async function POST(request: NextRequest) {
   try {
+    // Check if Supabase is initialized
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+    }
+
     const body = await request.json();
     const {
       userId,
@@ -61,6 +71,11 @@ export async function POST(request: NextRequest) {
 // Get user's extracted contacts
 export async function GET(request: NextRequest) {
   try {
+    // Check if Supabase is initialized
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const limit = parseInt(searchParams.get('limit') || '100');

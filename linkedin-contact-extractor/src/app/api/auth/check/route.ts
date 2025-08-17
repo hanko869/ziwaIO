@@ -18,10 +18,12 @@ export async function GET(request: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     
     return NextResponse.json({
-      id: decoded.userId,
-      email: decoded.email,
-      username: decoded.email.split('@')[0],
-      role: decoded.role || 'user'
+      user: {
+        id: decoded.id,
+        email: `${decoded.username}@example.com`, // Generate a dummy email since we don't store emails
+        username: decoded.username,
+        role: decoded.role || 'user'
+      }
     });
   } catch (error) {
     return NextResponse.json(

@@ -51,7 +51,7 @@ export const createUser = async (username: string, password: string, role: 'admi
     .from('users')
     .insert({
       username: username.toLowerCase(),
-      password: hashedPassword,
+      password_hash: hashedPassword,
       role,
       is_active: true
     })
@@ -63,12 +63,22 @@ export const createUser = async (username: string, password: string, role: 'admi
 };
 
 export const updateUserLastLogin = async (userId: string): Promise<void> => {
-  const { error } = await supabase
-    .from('users')
-    .update({ last_login: new Date().toISOString() })
-    .eq('id', userId);
-  
-  if (error) throw error;
+  try {
+    console.log('DEBUG: Updating last login for user:', userId);
+    const { error } = await supabase
+      .from('users')
+      .update({ last_login: new Date().toISOString() })
+      .eq('id', userId);
+    
+    if (error) {
+      console.error('ERROR updating last login:', error);
+      throw error;
+    }
+    console.log('DEBUG: Last login updated successfully');
+  } catch (error) {
+    console.error('ERROR in updateUserLastLogin:', error);
+    throw error;
+  }
 };
 
 export const toggleUserStatus = async (userId: string): Promise<void> => {
@@ -127,19 +137,29 @@ export const getRecentActivities = async (limit: number = 50): Promise<UserActiv
 };
 
 export const logActivity = async (activity: Omit<UserActivity, 'id' | 'timestamp'>): Promise<void> => {
-  const { error } = await supabase
-    .from('activities')
-    .insert({
-      user_id: activity.user_id,
-      username: activity.username,
-      action: activity.action,
-      details: activity.details,
-      linkedin_url: activity.linkedin_url,
-      contact_name: activity.contact_name,
-      success: activity.success
-    });
-  
-  if (error) throw error;
+  try {
+    console.log('DEBUG: Logging activity:', activity.action);
+    const { error } = await supabase
+      .from('activities')
+      .insert({
+        user_id: activity.user_id,
+        username: activity.username,
+        action: activity.action,
+        details: activity.details,
+        linkedin_url: activity.linkedin_url,
+        contact_name: activity.contact_name,
+        success: activity.success
+      });
+    
+    if (error) {
+      console.error('ERROR logging activity:', error);
+      throw error;
+    }
+    console.log('DEBUG: Activity logged successfully');
+  } catch (error) {
+    console.error('ERROR in logActivity:', error);
+    throw error;
+  }
 };
 
 // Statistics Functions

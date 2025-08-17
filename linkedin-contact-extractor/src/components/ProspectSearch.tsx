@@ -1,377 +1,248 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { searchProspects, extractContactWithWiza, createProspectList } from '@/utils/wiza';
-import { Contact } from '@/types/contact';
-import { saveContact } from '@/utils/storage';
+import React, { useState } from 'react';
+import { FiSearch, FiDownload, FiCheck } from 'react-icons/fi';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-interface ProspectProfile {
-  full_name: string;
-  linkedin_url: string;
-  industry?: string;
-  job_title?: string;
-  job_company_name?: string;
-  location_name?: string;
+interface SearchCriteria {
+  location: string;
+  experience: string;
+  ageRange: string;
 }
 
-interface SearchResult {
-  total: number;
-  profiles: ProspectProfile[];
+interface LinkedInProfile {
+  id: string;
+  name: string;
+  headline: string;
+  location: string;
+  profileUrl: string;
+  imageUrl?: string;
+  experience?: string;
+  selected?: boolean;
 }
 
-// Rate limiting state
-interface RateLimit {
-  lastRequest: number;
-  requestCount: number;
-}
-
-const ProspectSearch: React.FC = () => {
-  const [searchForm, setSearchForm] = useState({
-    firstName: '',
-    lastName: '',
-    jobTitle: '',
-    location: ''
+export default function ProspectSearch() {
+  const { t } = useLanguage();
+  const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
+    location: '',
+    experience: '',
+    ageRange: ''
   });
-  
-  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
+  const [searchResults, setSearchResults] = useState<LinkedInProfile[]>([]);
+  const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
-  const [extractingProfile, setExtractingProfile] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info' | 'warning'; message: string } | null>(null);
-  const [rateLimit, setRateLimit] = useState<RateLimit>({ lastRequest: 0, requestCount: 0 });
-
-  const RESULTS_PER_PAGE = 20;
-  const RATE_LIMIT_WINDOW = 60000; // 1 minute
-  const MAX_REQUESTS_PER_WINDOW = 10; // 10 requests per minute
-  const REQUEST_DELAY = 2000; // 2 seconds between requests
-
-  // Rate limiting check
-  const checkRateLimit = (): boolean => {
-    const now = Date.now();
-    const timeSinceLastRequest = now - rateLimit.lastRequest;
-    
-    // Reset counter if window has passed
-    if (timeSinceLastRequest > RATE_LIMIT_WINDOW) {
-      setRateLimit({ lastRequest: now, requestCount: 1 });
-      return true;
-    }
-    
-    // Check if we've hit the limit
-    if (rateLimit.requestCount >= MAX_REQUESTS_PER_WINDOW) {
-      const waitTime = Math.ceil((RATE_LIMIT_WINDOW - timeSinceLastRequest) / 1000);
-      setFeedback({
-        type: 'warning',
-        message: `Rate limit reached. Please wait ${waitTime} seconds before searching again.`
-      });
-      return false;
-    }
-    
-    // Check minimum delay between requests
-    if (timeSinceLastRequest < REQUEST_DELAY) {
-      setFeedback({
-        type: 'info',
-        message: 'Please wait a moment between searches to avoid rate limiting.'
-      });
-      return false;
-    }
-    
-    setRateLimit(prev => ({
-      lastRequest: now,
-      requestCount: prev.requestCount + 1
-    }));
-    
-    return true;
-  };
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async () => {
-    if (!checkRateLimit()) return;
-    
-    // Validate that at least one field is filled
-    if (!searchForm.firstName && !searchForm.lastName && !searchForm.jobTitle && !searchForm.location) {
-      setFeedback({
-        type: 'error',
-        message: 'Please fill in at least one search field.'
-      });
-      return;
-    }
-
+    console.log('Starting search with criteria:', searchCriteria);
     setIsSearching(true);
-    setFeedback(null);
-    setCurrentPage(1);
-
+    setError(null);
+    
     try {
-      console.log('Starting prospect search with:', searchForm);
-      
-      const response = await searchProspects(
-        searchForm.firstName || undefined,
-        searchForm.lastName || undefined,
-        searchForm.jobTitle || undefined,
-        searchForm.location || undefined,
-        RESULTS_PER_PAGE
-      );
+      const response = await fetch('/api/prospect-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchCriteria),
+      });
 
-      if (response.data && response.data.profiles) {
-        setSearchResults({
-          total: response.data.total,
-          profiles: response.data.profiles
-        });
+      console.log('Response status:', response.status);
 
-        setFeedback({
-          type: 'success',
-          message: `Found ${response.data.total} prospect${response.data.total !== 1 ? 's' : ''} matching your criteria.`
-        });
-      } else {
-        setSearchResults({ total: 0, profiles: [] });
-        setFeedback({
-          type: 'info',
-          message: 'No prospects found matching your search criteria. Try adjusting your search terms.'
-        });
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Response error:', errorData);
+        throw new Error('Search failed');
       }
 
-    } catch (error) {
-      console.error('Prospect search error:', error);
-      setFeedback({
-        type: 'error',
-        message: `Search failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-      setSearchResults(null);
+      const data = await response.json();
+      console.log('Search results:', data);
+      setSearchResults(data.profiles || []);
+    } catch (err) {
+      setError('Failed to search profiles. Please try again.');
+      console.error('Search error:', err);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleExtractContact = async (profile: ProspectProfile) => {
-    const profileKey = `${profile.full_name}-${profile.linkedin_url}`;
-    setExtractingProfile(profileKey);
-    setFeedback(null);
-
-    try {
-      console.log('Extracting contact for:', profile.full_name);
-      
-      // Add timeout wrapper for extraction
-      const extractionPromise = extractContactWithWiza(`https://www.linkedin.com${profile.linkedin_url}`);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Extraction timeout')), 180000) // 3 minutes timeout (increased)
-      );
-
-      const result = await Promise.race([extractionPromise, timeoutPromise]) as any;
-
-      if (result.success && result.contact) {
-        // Save the contact
-        saveContact(result.contact);
-        
-        setFeedback({
-          type: 'success',
-          message: `✅ Contact extracted successfully for ${profile.full_name}! Contact saved to your list.`
-        });
-      } else {
-        setFeedback({
-          type: 'warning',
-          message: `⚠️ Could not extract contact information for ${profile.full_name}. ${result.error || 'Contact information may not be publicly available.'}`
-        });
-      }
-
-    } catch (error) {
-      console.error('Contact extraction error:', error);
-      setFeedback({
-        type: 'error',
-        message: `❌ Failed to extract contact for ${profile.full_name}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-    } finally {
-      setExtractingProfile(null);
+  const toggleProfileSelection = (profileId: string) => {
+    const newSelection = new Set(selectedProfiles);
+    if (newSelection.has(profileId)) {
+      newSelection.delete(profileId);
+    } else {
+      newSelection.add(profileId);
     }
+    setSelectedProfiles(newSelection);
   };
 
-  const formatLinkedInUrl = (url: string): string => {
-    if (url.startsWith('https://')) return url;
-    if (url.startsWith('linkedin.com')) return `https://www.${url}`;
-    return `https://www.linkedin.com${url}`;
+  const exportSelectedProfiles = () => {
+    const selectedData = searchResults
+      .filter(profile => selectedProfiles.has(profile.id))
+      .map(profile => profile.profileUrl);
+    
+    // Create a text file with LinkedIn URLs
+    const content = selectedData.join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `linkedin-prospects-${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
-
-  const totalPages = searchResults ? Math.ceil(searchResults.total / RESULTS_PER_PAGE) : 0;
-  const currentProfiles = searchResults?.profiles || [];
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">🔍 LinkedIn Prospect Search</h2>
-      
+    <div className="space-y-6">
       {/* Search Form */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., John"
-            value={searchForm.firstName}
-            onChange={(e) => setSearchForm(prev => ({ ...prev, firstName: e.target.value }))}
-          />
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold mb-6">LinkedIn Prospect Search</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Location
+            </label>
+            <input
+              type="text"
+              value={searchCriteria.location}
+              onChange={(e) => setSearchCriteria({ ...searchCriteria, location: e.target.value })}
+              placeholder="e.g., New York, USA"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Years of Experience
+            </label>
+            <select
+              value={searchCriteria.experience}
+              onChange={(e) => setSearchCriteria({ ...searchCriteria, experience: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">Any</option>
+              <option value="0-2">0-2 years</option>
+              <option value="3-5">3-5 years</option>
+              <option value="6-10">6-10 years</option>
+              <option value="11-15">11-15 years</option>
+              <option value="16+">16+ years</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Age Range
+            </label>
+            <select
+              value={searchCriteria.ageRange}
+              onChange={(e) => setSearchCriteria({ ...searchCriteria, ageRange: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">Any</option>
+              <option value="18-24">18-24</option>
+              <option value="25-34">25-34</option>
+              <option value="35-44">35-44</option>
+              <option value="45-54">45-54</option>
+              <option value="55+">55+</option>
+            </select>
+          </div>
         </div>
         
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Smith"
-            value={searchForm.lastName}
-            onChange={(e) => setSearchForm(prev => ({ ...prev, lastName: e.target.value }))}
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Job Title</label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Software Engineer, CEO"
-            value={searchForm.jobTitle}
-            onChange={(e) => setSearchForm(prev => ({ ...prev, jobTitle: e.target.value }))}
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-          <input
-            type="text"
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., San Francisco, CA, USA or California, USA or USA"
-            value={searchForm.location}
-            onChange={(e) => setSearchForm(prev => ({ ...prev, location: e.target.value }))}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Use format: "City, State, Country" or "State, Country" or just "Country"
-          </p>
-        </div>
-      </div>
-
-      {/* Search Button */}
-      <div className="mb-6">
         <button
           onClick={handleSearch}
           disabled={isSearching}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-md transition-colors duration-200"
+          className="w-full md:w-auto px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {isSearching ? 'Searching...' : '🔍 Search Prospects'}
+          <FiSearch className="w-5 h-5" />
+          {isSearching ? 'Searching...' : 'Search Prospects'}
         </button>
         
-        <p className="text-sm text-gray-600 mt-2">
-          Rate limit: {MAX_REQUESTS_PER_WINDOW - rateLimit.requestCount} searches remaining this minute
-        </p>
+        {error && (
+          <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
       </div>
-
-      {/* Feedback */}
-      {feedback && (
-        <div className={`p-4 rounded-md mb-6 ${
-          feedback.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
-          feedback.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
-          feedback.type === 'warning' ? 'bg-yellow-50 text-yellow-800 border border-yellow-200' :
-          'bg-blue-50 text-blue-800 border border-blue-200'
-        }`}>
-          {feedback.message}
-        </div>
-      )}
 
       {/* Search Results */}
-      {searchResults && (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Search Results ({searchResults.total} found)
+      {searchResults.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-semibold">
+              Search Results ({selectedProfiles.size} selected)
             </h3>
-            {totalPages > 1 && (
-              <div className="text-sm text-gray-600">
-                Page {currentPage} of {totalPages}
-              </div>
+            {selectedProfiles.size > 0 && (
+              <button
+                onClick={exportSelectedProfiles}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <FiDownload className="w-4 h-4" />
+                Export Selected
+              </button>
             )}
           </div>
-
-          {/* Results List */}
-          <div className="space-y-4">
-            {currentProfiles.map((profile, index) => {
-              const profileKey = `${profile.full_name}-${profile.linkedin_url}`;
-              const isExtracting = extractingProfile === profileKey;
-              
-              return (
-                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-800 text-lg">{profile.full_name}</h4>
-                      {profile.job_title && (
-                        <p className="text-gray-600 mt-1">💼 {profile.job_title}</p>
-                      )}
-                      {profile.job_company_name && (
-                        <p className="text-gray-600 mt-1">🏢 {profile.job_company_name}</p>
-                      )}
-                      {profile.location_name && (
-                        <p className="text-gray-600 mt-1">📍 {profile.location_name}</p>
-                      )}
-                      {profile.industry && (
-                        <p className="text-gray-600 mt-1">🏭 {profile.industry}</p>
-                      )}
-                      <a 
-                        href={formatLinkedInUrl(profile.linkedin_url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block"
-                      >
-                        🔗 View LinkedIn Profile
-                      </a>
-                    </div>
-                    
-                    <button
-                      onClick={() => handleExtractContact(profile)}
-                      disabled={isExtracting || extractingProfile !== null}
-                      className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md ml-4 transition-colors duration-200"
-                    >
-                      {isExtracting ? 'Extracting...' : '📧 Extract Contact'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+          
+          <div className="mb-4 p-4 bg-blue-50 text-blue-700 rounded-lg">
+            <p className="text-sm">
+              <strong>Note:</strong> Currently showing demo data. To use real LinkedIn search, you need to integrate with:
+            </p>
+            <ul className="text-sm mt-2 ml-4 list-disc">
+              <li>ProxyCurl API - $49/month for 1000 searches</li>
+              <li>Phantombuster - $30/month starter plan</li>
+              <li>Apify LinkedIn Scraper - $49/month</li>
+            </ul>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center mt-6 space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md disabled:opacity-50 hover:bg-gray-300"
+          <div className="space-y-4">
+            {searchResults.map((profile) => (
+              <div
+                key={profile.id}
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  selectedProfiles.has(profile.id) 
+                    ? 'border-purple-500 bg-purple-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => toggleProfileSelection(profile.id)}
               >
-                ← Previous
-              </button>
-              
-              <span className="px-4 py-2 text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md disabled:opacity-50 hover:bg-gray-300"
-              >
-                Next →
-              </button>
-            </div>
-          )}
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-5 h-5 mt-1">
+                    {selectedProfiles.has(profile.id) && (
+                      <FiCheck className="w-5 h-5 text-purple-600" />
+                    )}
+                  </div>
+                  
+                  <div className="flex-grow">
+                    <h4 className="font-semibold text-gray-900">{profile.name}</h4>
+                    <p className="text-sm text-gray-600 mt-1">{profile.headline}</p>
+                    <p className="text-sm text-gray-500 mt-1">{profile.location}</p>
+                    {profile.experience && (
+                      <p className="text-sm text-gray-500 mt-1">Experience: {profile.experience}</p>
+                    )}
+                    <a
+                      href={profile.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-purple-600 hover:underline mt-2 inline-block"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      View LinkedIn Profile →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
-
-      {/* Help Text */}
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-        <h4 className="font-medium text-gray-800 mb-2">💡 Search Tips:</h4>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Fill in at least one search field to find prospects</li>
-          <li>• Use specific job titles for better results (e.g., "Software Engineer" vs "Engineer")</li>
-          <li>• Location format: "City, State, Country" (e.g., "San Francisco, CA, USA") or "State, Country" (e.g., "California, USA") or just "Country" (e.g., "USA")</li>
-          <li>• Rate limited to {MAX_REQUESTS_PER_WINDOW} searches per minute to ensure system stability</li>
-          <li>• Contact extraction may take up to 3 minutes per profile</li>
-        </ul>
-      </div>
+      
+      {searchResults.length === 0 && !isSearching && (
+        <div className="text-center py-12 text-gray-500">
+          Enter search criteria and click "Search Prospects" to find LinkedIn profiles
+        </div>
+      )}
     </div>
   );
-};
-
-export default ProspectSearch; 
+} 

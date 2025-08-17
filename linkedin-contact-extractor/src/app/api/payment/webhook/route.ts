@@ -93,13 +93,22 @@ export async function POST(request: NextRequest) {
     });
     
     // Update payment status based on NOWPayments status
-    if (payment_status === 'finished' || payment_status === 'confirmed' || payment_status === 'sending') {
-      // Payment confirmed
+    if (payment_status === 'finished' || payment_status === 'confirmed' || payment_status === 'sending' || payment_status === 'partially_paid') {
+      // Payment confirmed or partially paid
       try {
+        // For partially_paid, we might want to check the actual amount received
+        let creditsToAdd = parseFloat(price_amount);
+        
+        if (payment_status === 'partially_paid' && actually_paid) {
+          // Calculate credits based on actual amount paid
+          creditsToAdd = parseFloat(actually_paid);
+          console.log(`Partially paid: expected ${price_amount}, received ${actually_paid}`);
+        }
+        
         // Add credits to user
         const success = await creditService.addCreditsFromPayment(
           userId,
-          parseFloat(price_amount),
+          creditsToAdd,
           payment_id,
           payment_id // Using payment_id as transaction hash for NOWPayments
         );

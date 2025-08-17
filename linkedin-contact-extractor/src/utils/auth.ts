@@ -14,31 +14,47 @@ export interface User {
 }
 
 export async function verifyCredentials(username: string, password: string): Promise<DbUser | null> {
-  console.log('DEBUG: Attempting login for username:', username);
-  const user = await getUserByUsername(username);
-  console.log('DEBUG: User found:', !!user, user ? user.username : null);
-  if (!user || !user.is_active) {
-    console.log('DEBUG: User not found or not active');
-    return null;
+  try {
+    console.log('DEBUG: Attempting login for username:', username);
+    const user = await getUserByUsername(username);
+    
+    if (!user) {
+      console.log('DEBUG: User not found');
+      return null;
+    }
+    
+    console.log('DEBUG: User found:', user.username);
+    console.log('DEBUG: User has password_hash:', !!user.password_hash);
+    
+    console.log('DEBUG: Comparing password...');
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    console.log('DEBUG: Password match:', isMatch);
+    
+    if (!isMatch) {
+      console.log('DEBUG: Password does not match');
+      return null;
+    }
+    
+    // Update last login
+    await updateUserLastLogin(user.id);
+    
+    // Log activity - TEMPORARILY DISABLED
+    // TODO: Create activities table in Supabase
+    /*
+    await logActivity({
+      user_id: user.id,
+      username: user.username,
+      action: 'login',
+      success: true
+    });
+    */
+    
+    return user;
+  } catch (error) {
+    console.error('ERROR in verifyCredentials:', error);
+    console.error('Error stack:', (error as any).stack || 'No stack');
+    throw error;
   }
-  const isValidPassword = await bcrypt.compare(password, user.password);
-  console.log('DEBUG: Password match:', isValidPassword);
-  if (!isValidPassword) {
-    return null;
-  }
-  
-  // Update last login
-  await updateUserLastLogin(user.id);
-  
-  // Log login activity
-  await logActivity({
-    user_id: user.id,
-    username: user.username,
-    action: 'login',
-    details: 'User logged in successfully'
-  });
-  
-  return user;
 }
 
 export async function createToken(user: DbUser): Promise<string> {

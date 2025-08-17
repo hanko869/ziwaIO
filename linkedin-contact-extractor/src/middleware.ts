@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Routes that don't require authentication
+const publicRoutes = ['/login', '/api/auth/login', '/api/payment/webhook', '/api/test-db', '/api/debug-user', '/api/test-tables', '/test'];
+
 export function middleware(request: NextRequest) {
   // Get the pathname of the request (e.g. /, /login, /admin)
   const path = request.nextUrl.pathname;
 
   // Define public paths that don't require authentication
-  const isPublicPath = path === '/login' || path === '/api/auth/login' || path === '/api/auth/check';
+  const isPublicPath = publicRoutes.includes(path);
 
   // Get the token from the cookies
   const token = request.cookies.get('auth-token')?.value || '';

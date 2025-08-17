@@ -4,6 +4,7 @@ import React from 'react';
 import LogoutButton from '@/components/LogoutButton';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useLanguage } from '@/contexts/LanguageContext';
+import Link from 'next/link';
 
 interface NavigationProps {
   user: {
@@ -31,16 +32,22 @@ export default function Navigation({ user }: NavigationProps) {
           
           <div className="flex items-center gap-6">
             <LanguageSwitcher />
+            <Link 
+              href="/prospects"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Prospect Search
+            </Link>
             <span className="text-sm text-gray-700">
               {t.nav.welcome}, <span className="font-semibold">{user.username}</span>
             </span>
             {user.role === 'admin' && (
-              <a 
-                href="/admin" 
-                className="text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-md transition-all duration-200"
+              <Link 
+                href="/admin"
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
               >
-                {t.nav.adminDashboard}
-              </a>
+                Admin Dashboard
+              </Link>
             )}
             <LogoutButton />
           </div>

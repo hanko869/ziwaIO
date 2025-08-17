@@ -5,6 +5,7 @@ import { cookies } from 'next/headers';
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json();
+    console.log('Login attempt for username:', username);
 
     if (!username || !password) {
       return NextResponse.json(
@@ -14,6 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await verifyCredentials(username, password);
+    console.log('Verify credentials result:', user ? 'User found' : 'User not found');
 
     if (!user) {
       return NextResponse.json(
@@ -23,6 +25,8 @@ export async function POST(request: NextRequest) {
     }
 
     const token = await createToken(user);
+    console.log('Token created successfully');
+    
     const cookieStore = await cookies();
 
     cookieStore.set('auth-token', token, {
@@ -41,8 +45,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Login error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
     return NextResponse.json(
-      { error: 'An error occurred during login' },
+      { 
+        error: 'An error occurred during login',
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : 'Unknown error') : undefined
+      },
       { status: 500 }
     );
   }

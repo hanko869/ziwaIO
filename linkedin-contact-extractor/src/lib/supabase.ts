@@ -9,7 +9,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface DbUser {
   id: string;
   username: string;
-  password: string;
+  email?: string;
+  password_hash: string;
   role: 'admin' | 'user';
   created_at: string;
   last_login?: string;

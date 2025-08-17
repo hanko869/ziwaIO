@@ -2,8 +2,8 @@ import { Contact, ExtractionResult } from '@/types/contact';
 import { generateContactId } from './extraction';
 
 // Check Wiza API credits
-export const checkWizaCredits = async (): Promise<any> => {
-  const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+export const checkWizaCredits = async (apiKeyOverride?: string): Promise<any> => {
+  const apiKey = apiKeyOverride || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
   const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
   try {
@@ -171,9 +171,9 @@ const extractLinkedInUsername = (url: string): string | null => {
 };
 
 // Create a list with LinkedIn URL
-const createWizaList = async (linkedinUrl: string): Promise<WizaListResponse> => {
-  // Temporarily hardcode for testing
-  const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+const createWizaList = async (linkedinUrl: string, apiKeyOverride?: string): Promise<WizaListResponse> => {
+  // Use provided API key or default from environment
+  const apiKey = apiKeyOverride || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
   const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
   console.log('Environment check:', {
@@ -291,8 +291,8 @@ const checkWizaListStatus = async (listId: string): Promise<WizaListStatusRespon
 };
 
 // Get contacts from completed list
-const getWizaContacts = async (listId: string): Promise<WizaContactsResponse> => {
-  const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+const getWizaContacts = async (listId: string, apiKeyOverride?: string): Promise<WizaContactsResponse> => {
+  const apiKey = apiKeyOverride || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
   const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
   const response = await fetch(`${baseUrl}/api/lists/${listId}/contacts?segment=people`, {
@@ -349,12 +349,15 @@ const waitForListCompletion = async (listId: string, maxWaitTime = 180000): Prom
 };
 
 // Main function to extract contact from LinkedIn URL
-export const extractContactWithWiza = async (linkedinUrl: string): Promise<ExtractionResult> => {
+export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride?: string): Promise<ExtractionResult> => {
   console.log('Starting Wiza contact extraction for:', linkedinUrl);
   console.log('📱 IMPORTANT: Using Individual Reveal API for complete contact data (including phone numbers)');
   
+  // Use provided API key or default from environment
+  const apiKey = apiKeyOverride || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+  
   // Check available credits first
-  const credits = await checkWizaCredits();
+  const credits = await checkWizaCredits(apiKey);
   if (credits && credits.credits) {
     console.log('Available Wiza credits:', {
       email_credits: credits.credits.email_credits,
@@ -375,7 +378,6 @@ export const extractContactWithWiza = async (linkedinUrl: string): Promise<Extra
   
   try {
     // Skip the bulk list API entirely and use Individual Reveal
-    const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
     const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
     // Create Individual Reveal
@@ -679,8 +681,8 @@ export const extractContactWithWiza = async (linkedinUrl: string): Promise<Extra
 };
 
 // Individual Reveal API - Alternative approach for better contact data
-const createIndividualReveal = async (linkedinUrl: string): Promise<any> => {
-  const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+const createIndividualReveal = async (linkedinUrl: string, apiKeyOverride?: string): Promise<any> => {
+  const apiKey = apiKeyOverride || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
   const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
   const payload = {
@@ -719,9 +721,9 @@ const createIndividualReveal = async (linkedinUrl: string): Promise<any> => {
   return data;
 };
 
-// Check Individual Reveal status
-const checkIndividualRevealStatus = async (revealId: string): Promise<any> => {
-  const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+// Check status of individual reveal
+const checkIndividualRevealStatus = async (revealId: string, apiKeyOverride?: string): Promise<any> => {
+  const apiKey = apiKeyOverride || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
   const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
   const response = await fetch(`${baseUrl}/api/individual_reveals/${revealId}`, {
@@ -741,12 +743,12 @@ const checkIndividualRevealStatus = async (revealId: string): Promise<any> => {
 };
 
 // Alternative extraction using Individual Reveal API
-export const extractContactWithWizaIndividual = async (linkedinUrl: string): Promise<ExtractionResult> => {
+export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiKeyOverride?: string): Promise<ExtractionResult> => {
   try {
     console.log('🔄 Trying Individual Reveal API for:', linkedinUrl);
 
     // Step 1: Create individual reveal
-    const revealResponse = await createIndividualReveal(linkedinUrl);
+    const revealResponse = await createIndividualReveal(linkedinUrl, apiKeyOverride);
     
     // Step 2: Wait for completion
     const revealId = revealResponse.data.id.toString();
@@ -756,7 +758,7 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string): Pro
 
     while (Date.now() - startTime < maxWaitTime) {
       try {
-        const status = await checkIndividualRevealStatus(revealId);
+        const status = await checkIndividualRevealStatus(revealId, apiKeyOverride);
         console.log('Individual Reveal status:', { 
           status: status.data.status, 
           isComplete: status.data.is_complete 

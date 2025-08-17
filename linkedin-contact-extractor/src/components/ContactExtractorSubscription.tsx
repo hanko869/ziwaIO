@@ -7,6 +7,10 @@ import { saveContact, getStoredContacts, clearStoredContacts } from '@/utils/sto
 import { generateCSV, downloadCSV } from '@/utils/csv';
 import { useLanguage, interpolate } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
+import DepositCredits from './DepositCredits';
+import PaymentDetailsModal from './PaymentDetailsModal';
+import { initializeApiKeys } from '@/utils/apiKeyLoader';
+import { extractContactsInParallel } from '@/utils/parallelExtraction';
 
 const ContactExtractorSubscription: React.FC = () => {
   const { t } = useLanguage();
@@ -20,10 +24,16 @@ const ContactExtractorSubscription: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [creditBalance, setCreditBalance] = useState(100);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<any>(null);
 
   // Configuration constants
   const MAX_BULK_URLS = 500; // Increased from 100, max API limit is 2500
   const DELAY_BETWEEN_REQUESTS = 2000; // 2 seconds delay to avoid rate limiting
+
+  // Initialize API keys on component mount
+  useEffect(() => {
+    initializeApiKeys();
+  }, []);
 
   // Load contacts from localStorage and check API configuration on component mount
   useEffect(() => {
@@ -37,6 +47,39 @@ const ContactExtractorSubscription: React.FC = () => {
     // Fetch user's credit balance
     fetchCreditBalance();
   }, []);
+
+  useEffect(() => {
+    fetchCreditBalance();
+    
+    // Check if returning from payment
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentStatus = urlParams.get('payment');
+    const paymentId = localStorage.getItem('lastPaymentId');
+    
+    if (paymentStatus === 'success' && paymentId) {
+      // Check payment status and update credits
+      checkPaymentStatus(paymentId);
+      localStorage.removeItem('lastPaymentId');
+    }
+  }, [user]);
+
+  const checkPaymentStatus = async (paymentId: string) => {
+    try {
+      const response = await fetch('/api/payment/check-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId })
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        showFeedback('success', 'Payment confirmed! Credits have been added to your account.');
+        fetchCreditBalance(); // Refresh credit balance
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+    }
+  };
 
   const fetchCreditBalance = async () => {
     try {
@@ -201,31 +244,59 @@ const ContactExtractorSubscription: React.FC = () => {
       setIsExtracting(true);
       setBulkProgress({ current: 0, total: validUrls.length });
 
-      // Process URLs in batches using individual reveals
-      const extractedContacts: Contact[] = [];
+      // Use parallel extraction with multiple API keys
       let successCount = 0;
       let failedCount = 0;
+      const extractedContacts: Contact[] = [];
 
-      for (let i = 0; i < validUrls.length; i++) {
-        setBulkProgress({ current: i + 1, total: validUrls.length });
+      try {
+        console.log('Starting parallel extraction with multiple API keys...');
         
-        try {
-          const result = await extractContactFromLinkedIn(validUrls[i]);
-          if (result.success && result.contact) {
-            extractedContacts.push(result.contact);
-            saveContact(result.contact);
-            successCount++;
-          } else {
+        // Extract contacts in parallel
+        const results = await extractContactsInParallel(validUrls, {
+          onProgress: (current, total) => {
+            setBulkProgress({ current, total });
+          },
+          onTaskComplete: (url, result, index) => {
+            if (result.success && result.contact) {
+              extractedContacts.push(result.contact);
+              saveContact(result.contact);
+              successCount++;
+            } else {
+              failedCount++;
+              console.error(`Failed to extract ${url}:`, result.error);
+            }
+          }
+        });
+
+        console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);
+        
+      } catch (error) {
+        console.error('Parallel extraction error:', error);
+        // Fallback to sequential processing if parallel fails
+        console.log('Falling back to sequential processing...');
+        
+        for (let i = 0; i < validUrls.length; i++) {
+          setBulkProgress({ current: i + 1, total: validUrls.length });
+          
+          try {
+            const result = await extractContactFromLinkedIn(validUrls[i]);
+            if (result.success && result.contact) {
+              extractedContacts.push(result.contact);
+              saveContact(result.contact);
+              successCount++;
+            } else {
+              failedCount++;
+            }
+          } catch (error) {
+            console.error(`Failed to extract contact from ${validUrls[i]}:`, error);
             failedCount++;
           }
-        } catch (error) {
-          console.error(`Failed to extract contact from ${validUrls[i]}:`, error);
-          failedCount++;
-        }
-        
-        // Add a small delay between requests to avoid rate limiting
-        if (i < validUrls.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
+          
+          // Add a small delay between requests to avoid rate limiting
+          if (i < validUrls.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
+          }
         }
       }
 
@@ -280,27 +351,32 @@ const ContactExtractorSubscription: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              {t.hero.title}
-            </h1>
-            <p className="text-xl text-purple-100 max-w-2xl mx-auto">
-              {t.hero.subtitle}
-            </p>
-            {/* Credit Balance Display */}
-            <div className="mt-8 inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-6 py-3">
-              <span className="text-lg font-medium mr-2">Credit Balance:</span>
-              <span className="text-2xl font-bold">{creditBalance}</span>
-              <span className="ml-1 text-lg">credits</span>
-              <button
-                onClick={() => setShowPaymentModal(true)}
-                className="ml-4 px-4 py-1 bg-white text-purple-600 rounded-full text-sm font-medium hover:bg-purple-50 transition-colors"
-              >
-                Deposit Credits
-              </button>
+      {/* Header with Credits */}
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-center">
+            {t.hero.title}
+          </h1>
+          <p className="text-xl text-center mb-8 opacity-90">
+            {t.hero.subtitle}
+          </p>
+          <div className="flex items-center justify-center">
+            <div className="bg-white/20 backdrop-blur-sm rounded-full px-8 py-4 flex items-center gap-4">
+              <span className="text-lg font-medium">
+                Credit Balance: 
+                <span className="text-2xl font-bold ml-2">
+                  {user?.role === 'admin' ? '∞' : creditBalance}
+                </span>
+                {user?.role === 'admin' ? ' (Unlimited)' : ' credits'}
+              </span>
+              {user?.role !== 'admin' && (
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="ml-4 px-4 py-1 bg-white text-purple-600 rounded-full text-sm font-medium hover:bg-purple-50 transition-colors"
+                >
+                  Deposit Credits
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -658,7 +734,7 @@ const ContactExtractorSubscription: React.FC = () => {
       {/* Payment Modal */}
       {showPaymentModal && (
         <PaymentModal 
-          userId={user?.id || ''} 
+          userId={user?.id || 'anonymous'} 
           onClose={() => setShowPaymentModal(false)}
           onPaymentComplete={handlePaymentComplete}
         />
@@ -676,6 +752,7 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
   const { t } = useLanguage();
   const [depositAmount, setDepositAmount] = useState('10');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<any>(null);
   
   const creditsToReceive = Math.floor(parseFloat(depositAmount || '0') * 30);
 
@@ -701,26 +778,72 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
       });
 
       const data = await response.json();
+      console.log('Payment response:', data);
+      console.log('Response status:', response.status);
       
-      if (data.paymentUrl) {
-        if (data.paymentUrl === '#') {
-          // Test mode - just close modal and update credits
-          alert('Test mode: 300 credits added!');
+      if (data.testMode) {
+        // Test mode - simulate successful payment
+        alert(`Test Mode: ${data.message}\nAmount: ${data.amount} USDT\nCredits: ${data.credits}`);
+        
+        // Simulate adding credits by calling the webhook
+        const webhookResponse = await fetch('/api/payment/webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            payment_id: data.paymentId,
+            payment_status: 'finished',
+            order_id: `${userId}_${Date.now()}`,
+            price_amount: data.amount,
+            price_currency: 'usd'
+          })
+        });
+        
+        if (webhookResponse.ok) {
+          onClose();
           onPaymentComplete();
         } else {
-          // Redirect to NOWPayments checkout
-          window.location.href = data.paymentUrl;
+          throw new Error('Failed to process test payment');
         }
+      } else if (data.success && data.paymentUrl) {
+        // Save payment ID for later verification
+        if (data.paymentId) {
+          localStorage.setItem('lastPaymentId', data.paymentId);
+        }
+        // Redirect to NOWPayments checkout
+        window.location.href = data.paymentUrl;
+      } else if (data.success && data.payAddress) {
+        // Show payment details modal
+        setPaymentDetails({
+          paymentId: data.paymentId,
+          payAddress: data.payAddress,
+          payAmount: data.payAmount,
+          payCurrency: data.payCurrency,
+          createdAt: new Date().toISOString()
+        });
       } else {
         throw new Error(data.error || 'Failed to create payment');
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
+      alert(error instanceof Error ? error.message : 'Payment failed. Please try again.');
     } finally {
       setPaymentLoading(false);
     }
   };
+
+  // If we have payment details, show the PaymentDetailsModal
+  if (paymentDetails) {
+    return (
+      <PaymentDetailsModal
+        paymentData={paymentDetails}
+        onClose={() => {
+          setPaymentDetails(null);
+          onClose();
+        }}
+        onPaymentComplete={onPaymentComplete}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -787,6 +910,7 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
           <div className="text-center text-sm text-gray-500">
             <p>Pay as you go - only charged for successful extractions</p>
             <p className="mt-1">Powered by NOWPayments</p>
+            <p className="mt-2 text-xs text-amber-600">Note: Network fees will be added to your payment</p>
           </div>
         </div>
       </div>

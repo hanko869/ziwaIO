@@ -83,11 +83,24 @@ export class CreditService {
         .eq('user_id', walletAddress)
         .single();
 
-      if (error || !data) {
+      if (error) {
+        console.error('Error fetching user credits:', error);
+        // Try to initialize credits if they don't exist
+        if (error.code === 'PGRST116') { // No rows found
+          const initialized = await this.initializeUserCredits(walletAddress);
+          return initialized;
+        }
         return null;
       }
 
-      return data as UserCredits;
+      return {
+        id: data.id,
+        userId: data.user_id,
+        balance: data.balance || 0,
+        totalPurchased: data.total_purchased || 0,
+        totalUsed: data.total_used || 0,
+        lastUpdated: new Date(data.last_updated)
+      };
     } catch (error) {
       console.error('Error fetching user credits:', error);
       return null;
@@ -277,15 +290,50 @@ export class CreditService {
 
   // Record payment transaction
   async recordPayment(payment: Omit<PaymentTransaction, 'id' | 'createdAt'>): Promise<PaymentTransaction | null> {
+    if (!isSupabaseConfigured() || !supabase) {
+      console.error('Supabase not configured');
+      return null;
+    }
+
     try {
+      // Convert camelCase to snake_case for database
+      const dbPayment = {
+        user_id: payment.userId,
+        transaction_hash: payment.transactionHash,
+        from_address: payment.fromAddress,
+        to_address: payment.toAddress,
+        amountusdt: payment.amountUsdt, // PostgreSQL converts to lowercase
+        credits_purchased: payment.creditsPurchased,
+        credits_per_usdt: payment.creditsPerUsdt,
+        status: payment.status,
+        confirmations: payment.confirmations,
+        metadata: payment.metadata
+      };
+
       const { data, error } = await supabase
         .from('payment_transactions')
-        .insert(payment)
+        .insert(dbPayment)
         .select()
         .single();
 
       if (error) throw error;
-      return data;
+      
+      // Convert back to camelCase for TypeScript
+      return {
+        id: data.id,
+        userId: data.user_id,
+        transactionHash: data.transaction_hash,
+        fromAddress: data.from_address,
+        toAddress: data.to_address,
+        amountUsdt: data.amountusdt,
+        creditsPurchased: data.credits_purchased,
+        creditsPerUsdt: data.credits_per_usdt,
+        status: data.status,
+        confirmations: data.confirmations,
+        createdAt: new Date(data.created_at),
+        confirmedAt: data.confirmed_at ? new Date(data.confirmed_at) : undefined,
+        metadata: data.metadata
+      };
     } catch (error) {
       console.error('Error recording payment:', error);
       return null;
