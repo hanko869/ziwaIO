@@ -105,7 +105,10 @@ export async function POST(request: NextRequest) {
             order_description: `Deposit ${amount} USDT for ${amount * 30} credits`,
             ipn_callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payment/webhook`,
             success_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=success`,
-            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=cancelled`
+            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=cancelled`,
+            available_currencies: ['usdttrc20', 'usdterc20', 'usdtbsc', 'btc', 'eth', 'bnb', 'trx'],
+            is_fee_paid_by_user: true,
+            fixed_rate: true
           })
         });
 
