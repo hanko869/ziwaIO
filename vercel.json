@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm ci --prefix linkedin-contact-extractor && npm run build --prefix linkedin-contact-extractor",
+  "installCommand": "npm ci --prefix linkedin-contact-extractor",
+  "outputDirectory": "linkedin-contact-extractor/.next",
+  "framework": "nextjs"
+}
+
