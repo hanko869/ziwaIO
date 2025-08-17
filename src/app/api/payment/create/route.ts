@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create invoice-payment with NOWPayments (for hosted checkout with proper fee handling)
-    // Add 25% markup to cover all fees (network + service fees are high)
-    // This ensures we receive the full amount after all fees are deducted
-    const amountWithFees = parseFloat((amount * 1.25).toFixed(2));
-    console.log(`Original amount: ${amount}, Amount with fees (25% markup): ${amountWithFees}`);
+    // Add markup to cover transaction fees only (no profit)
+    // Based on actual fees: ~20% loss on transactions ($4 fee on $20 = 20%)
+    const amountWithFees = parseFloat((amount * 1.20).toFixed(2));
+    console.log(`Original amount: ${amount}, Amount with fees (20% to cover transaction costs): ${amountWithFees}`);
     
     const invoiceData = {
       price_amount: amountWithFees,

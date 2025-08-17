@@ -756,8 +756,8 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
   
   // Show the actual credits they'll receive (30 credits per USDT)
   const creditsToReceive = Math.floor(parseFloat(depositAmount || '0') * 30);
-  // Calculate the actual amount they'll pay (with 25% markup for fees)
-  const amountToPay = parseFloat((parseFloat(depositAmount || '0') * 1.25).toFixed(2));
+  // Calculate the actual amount they'll pay (with 20% to cover transaction fees)
+  const amountToPay = parseFloat((parseFloat(depositAmount || '0') * 1.20).toFixed(2));
 
   const handlePayment = async () => {
     const amount = parseFloat(depositAmount);
@@ -900,7 +900,7 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
               </span>
             </div>
             <p className="text-xs text-amber-600 mt-1">
-              Includes network and service fees
+              Includes transaction fees (~20% to cover network costs)
             </p>
           </div>
 
