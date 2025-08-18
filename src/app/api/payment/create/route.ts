@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         'x-api-key': NOWPAYMENTS_API_KEY,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(invoiceData)
+      body: JSON.stringify(paymentData)
     });
 
     const data = await response.json();
