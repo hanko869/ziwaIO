@@ -40,10 +40,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
       }
       
-      // Calculate the original amount (remove the 20% fee markup we added)
-      let amountToCredit = parseFloat(data.price_amount) / 1.20;
+      // Use the actual amount paid
+      let amountToCredit = parseFloat(data.price_amount);
       if (data.payment_status === 'partially_paid' && data.actually_paid) {
-        amountToCredit = parseFloat(data.actually_paid) / 1.20;
+        amountToCredit = parseFloat(data.actually_paid);
         console.log(`Partially paid: expected ${data.price_amount}, received ${data.actually_paid}`);
       }
       

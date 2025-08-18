@@ -40,13 +40,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
       }
 
-      // Calculate the original amount (remove the 20% fee markup we added)
-      let amountToCredit = parseFloat(payment.price_amount) / 1.20;
+      // Use the actual amount from the invoice
+      let amountToCredit = parseFloat(payment.price_amount);
       if (payment.payment_status === 'partially_paid' && payment.actually_paid) {
-        amountToCredit = parseFloat(payment.actually_paid) / 1.20;
+        amountToCredit = parseFloat(payment.actually_paid);
         console.log(`Partially paid: expected ${payment.price_amount}, received ${payment.actually_paid}`);
       }
-      console.log(`Payment amount: ${payment.price_amount}, Original amount for credits: ${amountToCredit}`);
+      console.log(`Payment amount: ${payment.price_amount}, Credits will be based on: ${amountToCredit}`);
       
       // Round to 2 decimal places
       amountToCredit = Math.round(amountToCredit * 100) / 100;
