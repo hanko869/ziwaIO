@@ -522,8 +522,8 @@ const ContactExtractorSubscription: React.FC = () => {
           <div className="mt-6 bg-purple-50 rounded-xl p-4 text-sm">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-purple-900 font-medium">Email: 1 credit ($0.033)</p>
-                <p className="text-purple-900 font-medium">Phone Number: 2 credits ($0.067)</p>
+                <p className="text-purple-900 font-medium">Email: {process.env.NEXT_PUBLIC_CREDITS_PER_EMAIL || '2'} credits (${((parseInt(process.env.NEXT_PUBLIC_CREDITS_PER_EMAIL || '2')) * 0.0045).toFixed(3)})</p>
+                <p className="text-purple-900 font-medium">Phone Number: {process.env.NEXT_PUBLIC_CREDITS_PER_PHONE || '5'} credits (${((parseInt(process.env.NEXT_PUBLIC_CREDITS_PER_PHONE || '5')) * 0.0045).toFixed(3)})</p>
                 <p className="text-purple-700">No charge if no results found</p>
               </div>
               <div className="text-right">
