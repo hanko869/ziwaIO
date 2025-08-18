@@ -731,12 +731,37 @@ const ContactExtractorSubscription: React.FC = () => {
       </div>
       
       {/* Payment Modal */}
-      {showPaymentModal && user?.id && (
-        <PaymentModal 
-          userId={user.id} 
-          onClose={() => setShowPaymentModal(false)}
-          onPaymentComplete={handlePaymentComplete}
-        />
+      {showPaymentModal && (
+        user?.id ? (
+          <PaymentModal 
+            userId={user.id} 
+            onClose={() => setShowPaymentModal(false)}
+            onPaymentComplete={handlePaymentComplete}
+          />
+        ) : (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Login Required</h2>
+              <p className="text-gray-600 mb-6">
+                Please log in to deposit credits. Your payment and credits need to be associated with your account.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => window.location.href = '/login'}
+                  className="flex-1 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors"
+                >
+                  Go to Login
+                </button>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
