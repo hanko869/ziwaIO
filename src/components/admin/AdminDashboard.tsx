@@ -8,6 +8,7 @@ import ActivityLog from './ActivityLog';
 import Statistics from './Statistics';
 import SystemSettings from './SystemSettings';
 import ApiKeyStatus from './ApiKeyStatus';
+import CreditManagement from './CreditManagement';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -167,6 +168,16 @@ export default function AdminDashboard() {
               >
                 API Keys
               </button>
+              <button
+                onClick={() => setActiveTab('credits')}
+                className={`py-2 px-6 border-b-2 font-medium text-sm ${
+                  activeTab === 'credits'
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Credits
+              </button>
             </nav>
           </div>
 
@@ -176,6 +187,7 @@ export default function AdminDashboard() {
             {activeTab === 'activity' && <ActivityLog />}
             {activeTab === 'settings' && <SystemSettings />}
             {activeTab === 'api-keys' && <ApiKeyStatus />}
+            {activeTab === 'credits' && <CreditManagement />}
           </div>
         </div>
       </div>
