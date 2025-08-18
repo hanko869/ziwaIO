@@ -35,8 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+        const data = await response.json();
+        // Handle both formats - with and without user wrapper
+        setUser(data.user || data);
       } else {
         setUser(null);
       }
