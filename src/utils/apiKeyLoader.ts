@@ -22,7 +22,10 @@ export function loadApiKeys(): string[] {
     keys.push('c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8');
   }
   
-  console.log(`Loaded ${keys.length} Wiza API key(s)`);
+  console.log(`Loaded ${keys.length} Wiza API key(s):`);
+  keys.forEach((key, index) => {
+    console.log(`  Key ${index + 1}: ${key.substring(0, 10)}...`);
+  });
   return keys;
 }
 

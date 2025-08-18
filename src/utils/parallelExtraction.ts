@@ -53,12 +53,15 @@ export class ParallelExtractionQueue {
   // Process all tasks with parallel execution
   async processAll(): Promise<Map<string, ExtractionResult>> {
     const batches = this.createBatches();
+    console.log(`Processing ${this.tasks.length} URLs in ${batches.length} batches with max ${this.options.maxConcurrent} concurrent`);
     
     for (const batch of batches) {
+      console.log(`Starting batch with ${batch.length} URLs`);
       await this.processBatch(batch);
       
       // Delay between batches to avoid rate limiting
       if (this.options.delayBetweenBatches && batch !== batches[batches.length - 1]) {
+        console.log(`Waiting ${this.options.delayBetweenBatches}ms before next batch...`);
         await new Promise(resolve => setTimeout(resolve, this.options.delayBetweenBatches));
       }
     }
@@ -87,6 +90,7 @@ export class ParallelExtractionQueue {
   // Process individual task
   private async processTask(task: ExtractionTask): Promise<void> {
     this.running++;
+    console.log(`Processing ${task.url} with API key ${task.apiKey.substring(0, 10)}...`);
 
     try {
       // Use the specific API key for this task
@@ -94,6 +98,7 @@ export class ParallelExtractionQueue {
       
       this.results.set(task.url, result);
       this.completed++;
+      console.log(`Completed ${task.url}: ${result.success ? 'success' : 'failed'}`);
 
       // Report progress
       if (this.options.onProgress) {
@@ -143,8 +148,12 @@ export async function extractContactsInParallel(
   urls: string[],
   options?: Partial<ExtractionQueueOptions>
 ): Promise<ExtractionResult[]> {
+  const apiKeyPool = getApiKeyPool();
+  const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
+  console.log(`Starting parallel extraction with ${availableKeys} available API keys`);
+  
   const queue = new ParallelExtractionQueue({
-    maxConcurrent: getApiKeyPool()?.getAvailableKeysCount() || 1,
+    maxConcurrent: availableKeys,
     ...options
   });
 
