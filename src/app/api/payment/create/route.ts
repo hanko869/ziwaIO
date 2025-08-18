@@ -104,8 +104,13 @@ export async function POST(request: NextRequest) {
       });
 
       const invoiceData = await invoiceResponse.json();
+      console.log('Invoice response:', invoiceData);
       
-      if (invoiceData.id) {
+      if (!invoiceResponse.ok) {
+        throw new Error('Failed to create invoice: ' + JSON.stringify(invoiceData));
+      }
+      
+      if (invoiceData.id && invoiceData.invoice_url) {
         return NextResponse.json({
           success: true,
           paymentId: data.payment_id,
@@ -113,6 +118,8 @@ export async function POST(request: NextRequest) {
           invoiceId: invoiceData.id,
           orderId: data.order_id
         }, { headers });
+      } else {
+        throw new Error('Invalid invoice response: ' + JSON.stringify(invoiceData));
       }
     }
     
