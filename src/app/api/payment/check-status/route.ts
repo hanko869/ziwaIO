@@ -30,9 +30,14 @@ export async function POST(request: NextRequest) {
     console.log('Payment status check:', payment);
 
     // Check if payment is completed or partially paid
+    // For partially paid, we'll check if they paid at least 95% of the requested amount
+    const isPartiallyPaidEnough = payment.payment_status === 'partially_paid' && 
+      payment.actually_paid && 
+      parseFloat(payment.actually_paid) >= (parseFloat(payment.price_amount) * 0.95);
+    
     if (payment.payment_status === 'finished' || 
         payment.payment_status === 'confirmed' || 
-        payment.payment_status === 'partially_paid') {
+        isPartiallyPaidEnough) {
       // Extract userId from order_id
       const [userId] = (payment.order_id || '').split('_');
       
@@ -53,11 +58,19 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Use the actual amount from the invoice
+      // Use the invoice amount for credits
+      // Even if partially paid, if they paid at least 95%, give them full credits
       let amountToCredit = parseFloat(payment.price_amount);
-      if (payment.payment_status === 'partially_paid' && payment.actually_paid) {
-        amountToCredit = parseFloat(payment.actually_paid);
+      
+      if (payment.payment_status === 'partially_paid') {
         console.log(`Partially paid: expected ${payment.price_amount}, received ${payment.actually_paid}`);
+        // If they paid less than 95%, only credit what they paid
+        if (!isPartiallyPaidEnough && payment.actually_paid) {
+          amountToCredit = parseFloat(payment.actually_paid);
+          console.log(`Payment insufficient, crediting only: ${amountToCredit}`);
+        } else {
+          console.log(`Payment sufficient (>=95%), crediting full amount: ${amountToCredit}`);
+        }
       }
       console.log(`Payment amount: ${payment.price_amount}, Credits will be based on: ${amountToCredit}`);
       

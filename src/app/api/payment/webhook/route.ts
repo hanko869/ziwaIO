@@ -28,9 +28,14 @@ export async function POST(request: NextRequest) {
     console.log('Webhook received:', data);
     
     // Check if payment is completed or partially paid
+    // For partially paid, we'll check if they paid at least 95% of the requested amount
+    const isPartiallyPaidEnough = data.payment_status === 'partially_paid' && 
+      data.actually_paid && 
+      parseFloat(data.actually_paid) >= (parseFloat(data.price_amount) * 0.95);
+    
     if (data.payment_status === 'finished' || 
         data.payment_status === 'confirmed' || 
-        data.payment_status === 'partially_paid') {
+        isPartiallyPaidEnough) {
       
       // Extract userId from order_id
       const [userId] = (data.order_id || '').split('_');
@@ -40,11 +45,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
       }
       
-      // Use the actual amount paid
+      // Use the invoice amount for credits
+      // Even if partially paid, if they paid at least 95%, give them full credits
       let amountToCredit = parseFloat(data.price_amount);
-      if (data.payment_status === 'partially_paid' && data.actually_paid) {
-        amountToCredit = parseFloat(data.actually_paid);
+      
+      if (data.payment_status === 'partially_paid') {
         console.log(`Partially paid: expected ${data.price_amount}, received ${data.actually_paid}`);
+        // If they paid less than 95%, only credit what they paid
+        if (!isPartiallyPaidEnough && data.actually_paid) {
+          amountToCredit = parseFloat(data.actually_paid);
+          console.log(`Payment insufficient, crediting only: ${amountToCredit}`);
+        } else {
+          console.log(`Payment sufficient (>=95%), crediting full amount: ${amountToCredit}`);
+        }
       }
       
       // Round to 2 decimal places
