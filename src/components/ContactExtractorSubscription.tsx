@@ -731,9 +731,9 @@ const ContactExtractorSubscription: React.FC = () => {
       </div>
       
       {/* Payment Modal */}
-      {showPaymentModal && (
+      {showPaymentModal && user?.id && (
         <PaymentModal 
-          userId={user?.id || 'anonymous'} 
+          userId={user.id} 
           onClose={() => setShowPaymentModal(false)}
           onPaymentComplete={handlePaymentComplete}
         />

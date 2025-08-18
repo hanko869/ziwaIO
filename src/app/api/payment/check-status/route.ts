@@ -36,8 +36,21 @@ export async function POST(request: NextRequest) {
       // Extract userId from order_id
       const [userId] = (payment.order_id || '').split('_');
       
+      console.log('Extracted userId from order_id:', { order_id: payment.order_id, userId });
+      
       if (!userId) {
+        console.error('Invalid user ID:', userId);
         return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
+      }
+      
+      // Handle anonymous payments - log them but don't add credits
+      if (userId === 'anonymous') {
+        console.warn('Anonymous payment detected:', payment);
+        return NextResponse.json({ 
+          success: false,
+          message: 'Payment was made anonymously. Please contact support with payment ID: ' + payment.payment_id,
+          payment: payment
+        });
       }
 
       // Use the actual amount from the invoice
