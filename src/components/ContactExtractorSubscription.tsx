@@ -22,7 +22,7 @@ const ContactExtractorSubscription: React.FC = () => {
   const [apiConfigured, setApiConfigured] = useState<boolean | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [creditBalance, setCreditBalance] = useState(100);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
 
@@ -126,7 +126,7 @@ const ContactExtractorSubscription: React.FC = () => {
     }
 
     // Check if user has credits
-    if (creditBalance < 1) {
+    if (creditBalance !== null && creditBalance < 1) {
       showFeedback('error', 'Insufficient credits. Please deposit more credits.');
       setShowPaymentModal(true);
       return;
@@ -365,7 +365,7 @@ const ContactExtractorSubscription: React.FC = () => {
               <span className="text-lg font-medium">
                 Credit Balance: 
                 <span className="text-2xl font-bold ml-2">
-                  {user?.role === 'admin' ? '∞' : creditBalance}
+                  {user?.role === 'admin' ? '∞' : (creditBalance === null ? '...' : creditBalance)}
                 </span>
                 {user?.role === 'admin' ? ' (Unlimited)' : ' credits'}
               </span>
