@@ -52,25 +52,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create invoice with NOWPayments
-    const amountWithFees = parseFloat((amount * 1.20).toFixed(2));
-    console.log(`Creating payment for ${amount} USDT (${amountWithFees} USD with fees)`);
-    
-    const invoiceData = {
-      price_amount: amountWithFees,
+    // Create payment with NOWPayments (simple working configuration)
+    const paymentData = {
+      price_amount: amount,
       price_currency: 'usd',
+      pay_currency: currency || 'usdttrc20',
       order_id: `${userId || 'user'}_${Date.now()}`,
       order_description: `Deposit ${amount} USDT for ${amount * 30} credits`,
-      ipn_callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payment/webhook`,
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=cancelled`,
-      is_fee_paid_by_user: true,
-      fixed_rate: true
+      ipn_callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payment/webhook`
     };
 
-    console.log('Creating invoice with NOWPayments:', invoiceData);
+    console.log('Creating payment with NOWPayments:', paymentData);
 
-    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
+    const response = await fetch(`${NOWPAYMENTS_API_URL}/payment`, {
       method: 'POST',
       headers: {
         'x-api-key': NOWPAYMENTS_API_KEY,
@@ -88,20 +82,41 @@ export async function POST(request: NextRequest) {
       throw new Error(data.message || data.error || 'Payment API error');
     }
 
-    // Invoice-payment API response handling
-    if (data.invoice_url) {
-      console.log('Invoice-payment created successfully:', data.id);
+    // Payment API response handling
+    if (data.payment_id) {
+      console.log('Payment created successfully:', data.payment_id);
       
-      return NextResponse.json({
-        success: true,
-        paymentId: data.id,
-        paymentUrl: data.invoice_url,
-        invoiceId: data.id,
-        orderId: data.order_id
-      }, { headers });
-    } else {
-      throw new Error('Invalid response - no invoice URL in response: ' + JSON.stringify(data));
+      // For payment API, we need to create an invoice to get the hosted checkout URL
+      const invoiceResponse = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': NOWPAYMENTS_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          price_amount: amount,
+          price_currency: 'usd',
+          order_id: data.order_id,
+          order_description: `Deposit ${amount} USDT for ${amount * 30} credits`,
+          success_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=success`,
+          cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=cancelled`
+        })
+      });
+
+      const invoiceData = await invoiceResponse.json();
+      
+      if (invoiceData.id) {
+        return NextResponse.json({
+          success: true,
+          paymentId: data.payment_id,
+          paymentUrl: invoiceData.invoice_url,
+          invoiceId: invoiceData.id,
+          orderId: data.order_id
+        }, { headers });
+      }
     }
+    
+    throw new Error('Failed to create payment: ' + JSON.stringify(data));
   } catch (error) {
     console.error('Payment creation error:', error);
     return NextResponse.json(

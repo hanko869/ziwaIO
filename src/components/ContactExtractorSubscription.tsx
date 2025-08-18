@@ -756,8 +756,6 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
   
   // Show the actual credits they'll receive (30 credits per USDT)
   const creditsToReceive = Math.floor(parseFloat(depositAmount || '0') * 30);
-  // Calculate the actual amount they'll pay (with 20% to cover transaction fees)
-  const amountToPay = parseFloat((parseFloat(depositAmount || '0') * 1.20).toFixed(2));
 
   const handlePayment = async () => {
     const amount = parseFloat(depositAmount);
@@ -896,7 +894,7 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
             <div className="flex justify-between items-center">
               <span className="text-gray-700">Total amount to pay:</span>
               <span className="text-xl font-bold text-amber-700">
-                ${amountToPay} USD
+                ${depositAmount} USD
               </span>
             </div>
             <p className="text-xs text-amber-600 mt-1">
