@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Creating invoice-payment with NOWPayments:', invoiceData);
 
-    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
+    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice-payment`, {
       method: 'POST',
       headers: {
         'x-api-key': NOWPAYMENTS_API_KEY,
