@@ -1,147 +1,85 @@
-// Payment webhook endpoint for processing TRC-20 transactions
 import { NextRequest, NextResponse } from 'next/server';
-import { creditService } from '@/lib/credits';
 import crypto from 'crypto';
-
-// Verify NOWPayments IPN signature
-function verifyIPNSignature(payload: any, receivedSignature: string): boolean {
-  const secret = process.env.NOWPAYMENTS_IPN_SECRET || '';
-  if (!secret || !receivedSignature) return false;
-  
-  // Sort the payload keys
-  const sortedKeys = Object.keys(payload).sort();
-  const sortedPayload: any = {};
-  sortedKeys.forEach(key => {
-    if (payload[key] !== null && payload[key] !== undefined) {
-      sortedPayload[key] = payload[key];
-    }
-  });
-  
-  // Create HMAC signature
-  const hmac = crypto.createHmac('sha512', secret);
-  hmac.update(JSON.stringify(sortedPayload));
-  const calculatedSignature = hmac.digest('hex');
-  
-  console.log('Webhook signature verification:', {
-    received: receivedSignature,
-    calculated: calculatedSignature,
-    match: calculatedSignature === receivedSignature
-  });
-  
-  return calculatedSignature === receivedSignature;
-}
+import { creditService } from '@/lib/credits';
 
 export async function POST(request: NextRequest) {
   try {
-    const signature = request.headers.get('x-nowpayments-sig');
+    // Get the raw body for signature verification
     const rawBody = await request.text();
-    let payload;
     
-    try {
-      payload = JSON.parse(rawBody);
-    } catch (e) {
-      console.error('Failed to parse webhook body:', e);
-      return NextResponse.json(
-        { error: 'Invalid JSON payload' },
-        { status: 400 }
-      );
+    // Get IPN secret from environment
+    const IPN_SECRET = process.env.NOWPAYMENTS_IPN_SECRET || '';
+    
+    // Verify the signature if provided
+    const signature = request.headers.get('x-nowpayments-sig');
+    if (signature && IPN_SECRET) {
+      const hmac = crypto.createHmac('sha512', IPN_SECRET);
+      hmac.update(rawBody);
+      const expectedSignature = hmac.digest('hex');
+      
+      if (signature !== expectedSignature) {
+        console.error('Invalid webhook signature');
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+      }
     }
     
-    console.log('Webhook received:', {
-      hasSignature: !!signature,
-      paymentId: payload.payment_id,
-      status: payload.payment_status,
-      orderId: payload.order_id
-    });
+    // Parse the webhook data
+    const data = JSON.parse(rawBody);
+    console.log('Webhook received:', data);
     
-    // Verify signature
-    if (signature && !verifyIPNSignature(payload, signature)) {
-      console.error('Invalid webhook signature');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401 }
+    // Check if payment is completed or partially paid
+    if (data.payment_status === 'finished' || 
+        data.payment_status === 'confirmed' || 
+        data.payment_status === 'partially_paid') {
+      
+      // Extract userId from order_id
+      const [userId] = (data.order_id || '').split('_');
+      
+      if (!userId) {
+        console.error('Invalid order ID in webhook:', data.order_id);
+        return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
+      }
+      
+      // Calculate the original amount (remove the 20% fee markup we added)
+      let amountToCredit = parseFloat(data.price_amount) / 1.20;
+      if (data.payment_status === 'partially_paid' && data.actually_paid) {
+        amountToCredit = parseFloat(data.actually_paid) / 1.20;
+        console.log(`Partially paid: expected ${data.price_amount}, received ${data.actually_paid}`);
+      }
+      
+      // Round to 2 decimal places
+      amountToCredit = Math.round(amountToCredit * 100) / 100;
+      console.log(`Adding credits for user ${userId}: ${amountToCredit} USDT = ${amountToCredit * 30} credits`);
+      
+      // Add credits to user
+      const success = await creditService.addCreditsFromPayment(
+        userId,
+        amountToCredit,
+        data.payment_id,
+        data.payment_id
       );
-    }
-    
-    const {
-      payment_id,
-      payment_status,
-      pay_amount,
-      actually_paid,
-      order_id,
-      pay_currency,
-      price_amount,
-      price_currency
-    } = payload;
-    
-    // Extract userId from order_id (format: userId_timestamp)
-    const [userId] = (order_id || '').split('_');
-    
-    if (!userId || !payment_id) {
-      console.error('Missing required fields:', { userId, payment_id });
-      return NextResponse.json(
-        { error: 'Invalid payment data' },
-        { status: 400 }
-      );
-    }
-    
-    console.log('Processing payment:', {
-      userId,
-      paymentId: payment_id,
-      status: payment_status,
-      amount: price_amount
-    });
-    
-    // Update payment status based on NOWPayments status
-    if (payment_status === 'finished' || payment_status === 'confirmed' || payment_status === 'sending' || payment_status === 'partially_paid') {
-      // Payment confirmed or partially paid
-      try {
-        // For partially_paid, we might want to check the actual amount received
-        let creditsToAdd = parseFloat(price_amount);
-        
-        if (payment_status === 'partially_paid' && actually_paid) {
-          // Calculate credits based on actual amount paid
-          creditsToAdd = parseFloat(actually_paid);
-          console.log(`Partially paid: expected ${price_amount}, received ${actually_paid}`);
-        }
-        
-        // Add credits to user
-        const success = await creditService.addCreditsFromPayment(
-          userId,
-          creditsToAdd,
-          payment_id,
-          payment_id // Using payment_id as transaction hash for NOWPayments
-        );
-        
-        if (success) {
-          console.log(`Successfully added credits to user ${userId} for payment ${payment_id}`);
-          return NextResponse.json({ 
-            success: true,
-            message: 'Payment processed successfully'
-          });
-        } else {
-          console.error('Failed to add credits to user');
-          return NextResponse.json({ 
-            success: false,
-            error: 'Failed to add credits'
-          }, { status: 500 });
-        }
-      } catch (error) {
-        console.error('Error processing payment:', error);
+      
+      if (success) {
+        console.log('Credits added successfully via webhook');
         return NextResponse.json({ 
-          success: false,
-          error: 'Failed to process payment'
+          success: true, 
+          message: 'Credits added successfully',
+          creditsAdded: Math.floor(amountToCredit * 30)
+        });
+      } else {
+        console.error('Failed to add credits via webhook');
+        return NextResponse.json({ 
+          error: 'Failed to add credits'
         }, { status: 500 });
       }
-    } else if (payment_status === 'failed' || payment_status === 'expired' || payment_status === 'refunded') {
-      // Payment failed
-      await creditService.updatePaymentStatus(payment_id, 'failed');
-      return NextResponse.json({ success: true });
-    } else {
-      // Payment still pending or waiting
-      console.log('Payment still pending:', payment_status);
-      return NextResponse.json({ success: true });
     }
+    
+    // For other statuses, just acknowledge
+    return NextResponse.json({ 
+      success: true,
+      message: `Payment status: ${data.payment_status}`
+    });
+    
   } catch (error) {
     console.error('Webhook error:', error);
     return NextResponse.json(
@@ -149,4 +87,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
