@@ -900,7 +900,7 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
               </span>
             </div>
             <p className="text-xs text-amber-600 mt-1">
-              Includes transaction fees (~20% to cover network costs)
+
             </p>
           </div>
 
@@ -925,7 +925,7 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
           <div className="text-center text-sm text-gray-500">
             <p>Pay as you go - only charged for successful extractions</p>
             <p className="mt-1">Powered by NOWPayments</p>
-            <p className="mt-2 text-xs text-amber-600">Note: Network fees will be added to your payment</p>
+
           </div>
         </div>
       </div>

@@ -52,11 +52,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create invoice-payment with NOWPayments (for hosted checkout with proper fee handling)
-    // Add markup to cover transaction fees only (no profit)
-    // Based on actual fees: ~20% loss on transactions ($4 fee on $20 = 20%)
+    // Create invoice with NOWPayments
     const amountWithFees = parseFloat((amount * 1.20).toFixed(2));
-    console.log(`Original amount: ${amount}, Amount with fees (20% to cover transaction costs): ${amountWithFees}`);
+    console.log(`Creating payment for ${amount} USDT (${amountWithFees} USD with fees)`);
     
     const invoiceData = {
       price_amount: amountWithFees,
@@ -66,14 +64,13 @@ export async function POST(request: NextRequest) {
       ipn_callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payment/webhook`,
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=cancelled`,
-      available_currencies: ['usdttrc20', 'usdterc20', 'usdtbsc', 'btc', 'eth', 'bnb', 'trx'],
       is_fee_paid_by_user: true,
       fixed_rate: true
     };
 
-    console.log('Creating invoice-payment with NOWPayments:', invoiceData);
+    console.log('Creating invoice with NOWPayments:', invoiceData);
 
-    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice-payment`, {
+    const response = await fetch(`${NOWPAYMENTS_API_URL}/invoice`, {
       method: 'POST',
       headers: {
         'x-api-key': NOWPAYMENTS_API_KEY,
