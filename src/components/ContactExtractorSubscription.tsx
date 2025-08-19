@@ -10,8 +10,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import DepositCredits from './DepositCredits';
 import PaymentDetailsModal from './PaymentDetailsModal';
 import { initializeApiKeys } from '@/utils/apiKeyLoader';
-import { extractContactsInParallel } from '@/utils/parallelExtraction';
-import { getApiKeyPool } from '@/utils/apiKeyPool';
 
 const ContactExtractorSubscription: React.FC = () => {
   const { t } = useLanguage();
@@ -137,7 +135,7 @@ const ContactExtractorSubscription: React.FC = () => {
     showFeedback('info', t.feedback.extracting);
 
     try {
-      const result = await extractContactFromLinkedIn(linkedinUrl);
+      const result = await extractContactFromLinkedIn(linkedinUrl, user?.id);
       
       if (result.success && result.contact) {
         saveContact(result.contact);
@@ -251,28 +249,41 @@ const ContactExtractorSubscription: React.FC = () => {
       const extractedContacts: Contact[] = [];
 
       try {
-        console.log('Starting parallel extraction with multiple API keys...');
+        console.log('Starting bulk extraction via server API...');
         
-        // Get API key pool info
-        const apiKeyPool = getApiKeyPool();
-        const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
-        console.log(`Available API keys for extraction: ${availableKeys}`);
-        
-        // Extract contacts in parallel
-        const results = await extractContactsInParallel(validUrls, {
-          onProgress: (current, total) => {
-            setBulkProgress({ current, total });
+        // Use server-side API endpoint for bulk extraction
+        const response = await fetch('/api/extract-bulk', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-          onTaskComplete: (url, result, index) => {
-            if (result.success && result.contact) {
-              extractedContacts.push(result.contact);
-              saveContact(result.contact);
-              successCount++;
-            } else {
-              failedCount++;
-              console.error(`Failed to extract ${url}:`, result.error);
-            }
+          body: JSON.stringify({
+            urls: validUrls,
+            userId: user?.id
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Bulk extraction failed');
+        }
+        
+        const data = await response.json();
+        console.log('Bulk extraction completed:', data.stats);
+        
+        // Process results
+        data.results.forEach((result: any, index: number) => {
+          if (result.success && result.contact) {
+            extractedContacts.push(result.contact);
+            saveContact(result.contact);
+            successCount++;
+          } else {
+            failedCount++;
+            console.error(`Failed to extract ${validUrls[index]}:`, result.error);
           }
+          
+          // Update progress
+          setBulkProgress({ current: index + 1, total: validUrls.length });
         });
 
         console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);

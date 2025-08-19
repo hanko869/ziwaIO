@@ -77,7 +77,7 @@ export const extractContactFromAPI = async (linkedinUrl: string): Promise<Extrac
 };
 
 // Extract contact information from LinkedIn URL using Wiza API
-export const extractContactFromLinkedIn = async (linkedinUrl: string): Promise<ExtractionResult> => {
+export const extractContactFromLinkedIn = async (linkedinUrl: string, userId?: string): Promise<ExtractionResult> => {
   if (!isValidLinkedInUrl(linkedinUrl)) {
     return {
       success: false,
@@ -85,7 +85,40 @@ export const extractContactFromLinkedIn = async (linkedinUrl: string): Promise<E
     };
   }
 
-  return await extractContactWithWiza(linkedinUrl);
+  try {
+    // Use server-side API endpoint to access all API keys
+    const response = await fetch('/api/extract-single', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: linkedinUrl,
+        userId: userId || null
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      return {
+        success: false,
+        error: error.error || 'Extraction failed'
+      };
+    }
+    
+    const data = await response.json();
+    return {
+      success: data.success,
+      contact: data.contact,
+      error: data.error
+    };
+  } catch (error) {
+    console.error('Extraction error:', error);
+    return {
+      success: false,
+      error: 'Network error occurred during extraction'
+    };
+  }
 };
 
 // Check if Wiza API is configured
