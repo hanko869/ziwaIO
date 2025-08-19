@@ -53,9 +53,11 @@ const ContactExtractorSubscription: React.FC = () => {
     // Check if returning from payment
     const urlParams = new URLSearchParams(window.location.search);
     const paymentStatus = urlParams.get('payment');
-    const paymentId = localStorage.getItem('lastPaymentId');
+    const npId = urlParams.get('NP_id'); // NOWPayments ID from redirect
+    const paymentId = localStorage.getItem('lastPaymentId') || npId;
     
     if (paymentStatus === 'success' && paymentId) {
+      console.log('Checking payment status for:', paymentId);
       // Check payment status and update credits
       checkPaymentStatus(paymentId);
       localStorage.removeItem('lastPaymentId');
@@ -64,6 +66,7 @@ const ContactExtractorSubscription: React.FC = () => {
 
   const checkPaymentStatus = async (paymentId: string) => {
     try {
+      showFeedback('info', 'Verifying payment...');
       const response = await fetch('/api/payment/check-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -71,12 +74,18 @@ const ContactExtractorSubscription: React.FC = () => {
       });
       
       const data = await response.json();
+      console.log('Payment check response:', data);
+      
       if (data.success) {
-        showFeedback('success', 'Payment confirmed! Credits have been added to your account.');
+        showFeedback('success', `Payment confirmed! ${data.creditsAdded || 0} credits have been added to your account.`);
         fetchCreditBalance(); // Refresh credit balance
+      } else {
+        showFeedback('error', data.message || 'Payment verification failed. Please contact support.');
+        console.error('Payment check failed:', data);
       }
     } catch (error) {
       console.error('Error checking payment status:', error);
+      showFeedback('error', 'Failed to verify payment. Please contact support.');
     }
   };
 
