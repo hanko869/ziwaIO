@@ -293,18 +293,20 @@ const ContactExtractorSubscription: React.FC = () => {
       }
 
       setIsExtracting(true);
-      setBulkProgress({ current: 0, total: validUrls.length });
-
+      
       // Use parallel extraction with multiple API keys
       let successCount = 0;
       let failedCount = 0;
       const extractedContacts: Contact[] = [];
+      
+      // Show initial progress immediately
+      setBulkProgress({ current: 0, total: validUrls.length });
 
       try {
         console.log('Starting bulk extraction via server API...');
         
-        // Show initial progress
-        setBulkProgress({ current: 0, total: validUrls.length });
+        // Add small delay to ensure UI updates
+        await new Promise(resolve => setTimeout(resolve, 100));
         
         // Use server-side API endpoint for bulk extraction
         const response = await fetch('/api/extract-bulk-simple', {
@@ -342,11 +344,6 @@ const ContactExtractorSubscription: React.FC = () => {
           });
           
           console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);
-          
-          // Add extracted contacts to the UI state immediately
-          if (extractedContacts.length > 0) {
-            setContacts(prev => [...prev, ...extractedContacts]);
-          }
         }
         
       } catch (error) {
@@ -377,8 +374,14 @@ const ContactExtractorSubscription: React.FC = () => {
         }
       }
 
+      // Wait a moment for database writes to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Refresh contacts from database after bulk extraction
       await fetchContactsFromDatabase();
+      
+      // Refresh credit balance
+      await fetchCreditBalance();
       
       let message = interpolate(t.feedback.bulkSuccess, { success: successCount });
       if (failedCount > 0) {

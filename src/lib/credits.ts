@@ -221,7 +221,7 @@ export class CreditService {
       }
 
       if (credits.balance < amount) {
-        console.error('Insufficient credits');
+        console.log(`Credit check: User has ${credits.balance} credits, needs ${amount} credits`);
         return false;
       }
 
