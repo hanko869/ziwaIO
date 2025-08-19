@@ -1,5 +1,4 @@
 import ClientWrapper from '@/components/ClientWrapper';
-import LanguageSwitcher from '@/components/LanguageSwitcher';
 import Navigation from '@/components/Navigation';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -33,9 +32,6 @@ export default async function Home() {
       <Navigation user={{ username: user.username, role: user.role }} />
       <div className="flex flex-col items-center justify-between p-4 md:p-24">
         <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm">
-          <div className="fixed top-4 right-4 z-50 flex items-center gap-4">
-            <LanguageSwitcher />
-          </div>
           <ClientWrapper />
         </div>
       </div>
