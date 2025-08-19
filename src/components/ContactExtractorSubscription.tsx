@@ -45,7 +45,8 @@ const ContactExtractorSubscription: React.FC = () => {
       const response = await fetch(`/api/contacts?userId=${user.id}`);
       if (response.ok) {
         const data = await response.json();
-        const dbContacts = data.contacts || [];
+        const dbContacts = data.data || [];
+        console.log('Fetched contacts from database:', dbContacts.length);
         
         // Transform database contacts to match our Contact interface
         const transformedContacts: Contact[] = dbContacts.map((dbContact: any) => ({
@@ -60,6 +61,7 @@ const ContactExtractorSubscription: React.FC = () => {
           location: dbContact.location
         }));
         
+        console.log('Transformed contacts:', transformedContacts.length);
         setContacts(transformedContacts);
       } else {
         console.error('Failed to fetch contacts:', response.status, response.statusText);
@@ -301,6 +303,7 @@ const ContactExtractorSubscription: React.FC = () => {
       
       // Show initial progress immediately
       setBulkProgress({ current: 0, total: validUrls.length });
+      console.log('Set bulk progress:', { current: 0, total: validUrls.length });
 
       try {
         console.log('Starting bulk extraction via server API...');
@@ -332,6 +335,7 @@ const ContactExtractorSubscription: React.FC = () => {
         if (data.results && Array.isArray(data.results)) {
           // Update progress to show completion
           setBulkProgress({ current: validUrls.length, total: validUrls.length });
+          console.log('Updated bulk progress to completion');
           
           data.results.forEach((result: any, index: number) => {
             if (result.success && result.contact) {
@@ -345,6 +349,9 @@ const ContactExtractorSubscription: React.FC = () => {
           
           console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);
         }
+        
+        // Log the extracted contacts
+        console.log('Extracted contacts from server:', extractedContacts);
         
       } catch (error) {
         console.error('Parallel extraction error:', error);
@@ -582,6 +589,7 @@ const ContactExtractorSubscription: React.FC = () => {
               </div>
 
               {/* Progress Bar */}
+              {console.log('Rendering progress bar:', bulkProgress)}
               {bulkProgress && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-gray-600">
@@ -688,7 +696,9 @@ const ContactExtractorSubscription: React.FC = () => {
                         </div>
                         <div>
                           <h3 className="font-semibold text-gray-900 text-lg">{contact.name}</h3>
-                          {!contact.email && !contact.phone && (
+                          {(!contact.emails || contact.emails.length === 0) && 
+                           (!contact.phones || contact.phones.length === 0) && 
+                           !contact.email && !contact.phone && (
                             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
                               {t.contacts.noContactInfo}
                             </span>
@@ -781,7 +791,9 @@ const ContactExtractorSubscription: React.FC = () => {
                           </div>
                         )}
                         
-                        {!contact.email && !contact.phone && (
+                        {(!contact.emails || contact.emails.length === 0) && 
+                         (!contact.phones || contact.phones.length === 0) && 
+                         !contact.email && !contact.phone && (
                           <div className="text-amber-600 text-sm italic">
                             {t.contacts.profileNoInfo}
                           </div>

@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         // Save to database if we have supabase client and userId
         if (supabase && userId) {
           try {
-            const { error } = await supabase
+            const { data: savedContact, error } = await supabase
               .from('extracted_contacts')
               .insert({
                 user_id: userId,
@@ -75,10 +75,14 @@ export async function POST(request: NextRequest) {
                 location: result.contact.location,
                 credits_used: (emailCount * 1) + (phoneCount * 2),
                 extracted_at: new Date().toISOString()
-              });
+              })
+              .select()
+              .single();
               
             if (error) {
               console.error('Error saving contact to database:', error);
+            } else {
+              console.log('Contact saved successfully:', savedContact?.id, savedContact?.name);
             }
           } catch (dbError) {
             console.error('Database save error:', dbError);
