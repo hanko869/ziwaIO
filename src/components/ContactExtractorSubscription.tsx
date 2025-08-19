@@ -62,11 +62,13 @@ const ContactExtractorSubscription: React.FC = () => {
         
         setContacts(transformedContacts);
       } else {
-        console.error('Failed to fetch contacts:', response.status);
+        console.error('Failed to fetch contacts:', response.status, response.statusText);
+        // Don't show error to user, just use empty contacts
         setContacts([]);
       }
     } catch (error) {
-      console.error('Error fetching contacts:', error);
+      console.error('Error fetching contacts from database:', error);
+      // Don't show error to user, just use empty contacts
       setContacts([]);
     }
   };

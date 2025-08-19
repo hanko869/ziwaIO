@@ -407,9 +407,23 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
       const errorText = await response.text();
       console.error('Individual Reveal creation failed:', { 
         status: response.status, 
-        error: errorText
+        statusText: response.statusText,
+        error: errorText,
+        url: response.url,
+        apiKey: apiKey ? apiKey.substring(0, 10) + '...' : 'not provided'
       });
-      throw new Error(`Failed to create individual reveal: ${response.status} ${errorText}`);
+      
+      // Try to parse error for more details
+      let errorDetails;
+      try {
+        errorDetails = JSON.parse(errorText);
+        console.error('Parsed error details:', errorDetails);
+      } catch (e) {
+        // Not JSON, use raw text
+        errorDetails = errorText;
+      }
+      
+      throw new Error(`Failed to create individual reveal: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const revealResponse = await response.json();
@@ -709,11 +723,25 @@ const createIndividualReveal = async (linkedinUrl: string, apiKeyOverride?: stri
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Individual Reveal creation failed:', { 
+    console.error('Individual Reveal creation failed (second function):', { 
       status: response.status, 
-      error: errorText
+      statusText: response.statusText,
+      error: errorText,
+      url: response.url,
+      apiKey: apiKeyOverride ? apiKeyOverride.substring(0, 10) + '...' : 'default'
     });
-    throw new Error(`Failed to create individual reveal: ${response.status} ${errorText}`);
+    
+    // Try to parse error for more details
+    let errorDetails;
+    try {
+      errorDetails = JSON.parse(errorText);
+      console.error('Parsed error details:', errorDetails);
+    } catch (e) {
+      // Not JSON, use raw text
+      errorDetails = errorText;
+    }
+    
+    throw new Error(`Failed to create individual reveal: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
   const data = await response.json();

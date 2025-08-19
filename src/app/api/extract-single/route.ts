@@ -26,9 +26,18 @@ export async function POST(request: NextRequest) {
     // Initialize API keys on server side
     initializeApiKeys();
     const apiKeyPool = getApiKeyPool();
+    
+    // Debug: Log available keys
+    console.log('API Key Pool status:', {
+      initialized: !!apiKeyPool,
+      availableKeys: apiKeyPool?.getAvailableKeysCount() || 0,
+      allKeys: apiKeyPool?.getAllKeysStatus() || []
+    });
+    
     const apiKey = apiKeyPool?.getNextKey();
     
     if (!apiKey) {
+      console.error('No API key available. Pool status:', apiKeyPool?.getAllKeysStatus());
       return NextResponse.json(
         { error: 'No API keys available' },
         { status: 503 }
