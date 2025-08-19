@@ -205,6 +205,63 @@ export class CreditService {
     }
   }
 
+  // Simple deduct credits method
+  async deductCredits(userId: string, amount: number, description: string): Promise<boolean> {
+    if (!isSupabaseConfigured() || !supabase) {
+      console.error('Supabase not configured - credits not deducted');
+      return true; // Return true to allow extraction to continue in dev
+    }
+
+    try {
+      // Get current credits
+      const credits = await this.getUserCredits(userId);
+      if (!credits) {
+        console.error('User credits not found');
+        return false;
+      }
+
+      if (credits.balance < amount) {
+        console.error('Insufficient credits');
+        return false;
+      }
+
+      const newBalance = credits.balance - amount;
+      const newTotalUsed = credits.totalUsed + amount;
+
+      // Update user credits
+      const { error: updateError } = await supabase
+        .from('user_credits')
+        .update({
+          balance: newBalance,
+          total_used: newTotalUsed,
+          last_updated: new Date().toISOString()
+        })
+        .eq('user_id', userId);
+
+      if (updateError) throw updateError;
+
+      // Record transaction
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: userId,
+          type: 'usage',
+          amount: -amount,
+          balance_after: newBalance,
+          description: description,
+          metadata: {}
+        });
+
+      if (transactionError) throw transactionError;
+
+      console.log(`Deducted ${amount} credits from user ${userId}. New balance: ${newBalance}`);
+      return true;
+    } catch (error) {
+      console.error('Error deducting credits:', error);
+      return false;
+    }
+  }
+
   // Add credits after payment (pay-as-you-go)
   async addCreditsFromPayment(
     userId: string,
