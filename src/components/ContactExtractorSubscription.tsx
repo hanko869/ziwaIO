@@ -11,6 +11,7 @@ import DepositCredits from './DepositCredits';
 import PaymentDetailsModal from './PaymentDetailsModal';
 import { initializeApiKeys } from '@/utils/apiKeyLoader';
 import { extractContactsInParallel } from '@/utils/parallelExtraction';
+import { getApiKeyPool } from '@/utils/apiKeyPool';
 
 const ContactExtractorSubscription: React.FC = () => {
   const { t } = useLanguage();
@@ -251,6 +252,11 @@ const ContactExtractorSubscription: React.FC = () => {
 
       try {
         console.log('Starting parallel extraction with multiple API keys...');
+        
+        // Get API key pool info
+        const apiKeyPool = getApiKeyPool();
+        const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
+        console.log(`Available API keys for extraction: ${availableKeys}`);
         
         // Extract contacts in parallel
         const results = await extractContactsInParallel(validUrls, {

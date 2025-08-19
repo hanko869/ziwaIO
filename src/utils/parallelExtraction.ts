@@ -55,8 +55,20 @@ export class ParallelExtractionQueue {
     const batches = this.createBatches();
     console.log(`Processing ${this.tasks.length} URLs in ${batches.length} batches with max ${this.options.maxConcurrent} concurrent`);
     
+    // Log API key distribution
+    const keyDistribution = new Map<string, number>();
+    this.tasks.forEach(task => {
+      const keyId = task.apiKey.substring(0, 10) + '...';
+      keyDistribution.set(keyId, (keyDistribution.get(keyId) || 0) + 1);
+    });
+    console.log('API Key Distribution:', Array.from(keyDistribution.entries()));
+    
     for (const batch of batches) {
       console.log(`Starting batch with ${batch.length} URLs`);
+      // Log which API keys are in this batch
+      const batchKeys = batch.map(t => t.apiKey.substring(0, 10) + '...').join(', ');
+      console.log(`Batch API keys: ${batchKeys}`);
+      
       await this.processBatch(batch);
       
       // Delay between batches to avoid rate limiting
@@ -83,8 +95,12 @@ export class ParallelExtractionQueue {
 
   // Process a batch of tasks in parallel
   private async processBatch(batch: ExtractionTask[]): Promise<void> {
+    console.log(`Processing batch of ${batch.length} tasks in parallel`);
+    const startTime = Date.now();
     const promises = batch.map(task => this.processTask(task));
     await Promise.all(promises);
+    const duration = Date.now() - startTime;
+    console.log(`Batch completed in ${duration}ms (${(duration / 1000).toFixed(2)}s)`);
   }
 
   // Process individual task
@@ -152,13 +168,21 @@ export async function extractContactsInParallel(
   const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
   console.log(`Starting parallel extraction with ${availableKeys} available API keys`);
   
+  // Log current API key usage stats
+  const keyStats = apiKeyPool?.getAllKeysStatus();
+  console.log('API Key Usage Before Extraction:', keyStats);
+  
   const queue = new ParallelExtractionQueue({
-    maxConcurrent: availableKeys,
+    maxConcurrent: availableKeys * 2, // Allow 2x concurrency to ensure all keys are used
     ...options
   });
 
   queue.addUrls(urls);
   const resultsMap = await queue.processAll();
+  
+  // Log API key usage after extraction
+  const keyStatsAfter = apiKeyPool?.getAllKeysStatus();
+  console.log('API Key Usage After Extraction:', keyStatsAfter);
 
   // Return results in the same order as input URLs
   return urls.map(url => resultsMap.get(url) || {
