@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       price_currency: 'usd',
       pay_currency: currency || 'usdttrc20',
       order_id: `${userId || 'user'}_${Date.now()}`,
-      order_description: `Deposit ${amount} USDT for ${amount * 30} credits`,
+      order_description: `Deposit ${amount} USDT for ${amount * 30} credits (99%+ payment accepted)`,
       ipn_callback_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/payment/webhook`
     };
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
           price_amount: amount,
           price_currency: 'usd',
           order_id: data.order_id,
-          order_description: `Deposit ${amount} USDT for ${amount * 30} credits`,
+          order_description: `Deposit ${amount} USDT for ${amount * 30} credits (99%+ payment accepted)`,
           success_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=success`,
           cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}?payment=cancelled`
         })

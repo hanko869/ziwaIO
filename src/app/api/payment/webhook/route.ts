@@ -28,14 +28,33 @@ export async function POST(request: NextRequest) {
     console.log('Webhook received:', data);
     
     // Check if payment is completed or partially paid
-    // For partially paid, we'll check if they paid at least 95% of the requested amount
-    const isPartiallyPaidEnough = data.payment_status === 'partially_paid' && 
-      data.actually_paid && 
-      parseFloat(data.actually_paid) >= (parseFloat(data.price_amount) * 0.95);
+    // Accept payments that are within a reasonable tolerance
+    let shouldProcessPayment = false;
+    let paymentAcceptanceReason = '';
     
-    if (data.payment_status === 'finished' || 
-        data.payment_status === 'confirmed' || 
-        isPartiallyPaidEnough) {
+    if (data.payment_status === 'finished' || data.payment_status === 'confirmed') {
+      shouldProcessPayment = true;
+      paymentAcceptanceReason = 'Payment fully confirmed';
+    } else if (data.payment_status === 'partially_paid' && data.actually_paid) {
+      const requestedAmount = parseFloat(data.price_amount);
+      const actuallyPaid = parseFloat(data.actually_paid);
+      const difference = Math.abs(requestedAmount - actuallyPaid);
+      const percentagePaid = (actuallyPaid / requestedAmount) * 100;
+      
+      // Accept if:
+      // 1. Paid at least 99% of requested amount
+      // 2. Difference is less than 0.01 USDT (rounding errors)
+      // 3. Paid more than requested (overpayment)
+      if (percentagePaid >= 99 || difference < 0.01 || actuallyPaid > requestedAmount) {
+        shouldProcessPayment = true;
+        paymentAcceptanceReason = `Partial payment accepted: paid ${actuallyPaid.toFixed(6)} of ${requestedAmount.toFixed(6)} (${percentagePaid.toFixed(2)}%)`;
+        console.log(paymentAcceptanceReason);
+      } else {
+        console.log(`Partial payment rejected: paid ${actuallyPaid.toFixed(6)} of ${requestedAmount.toFixed(6)} (${percentagePaid.toFixed(2)}%)`);
+      }
+    }
+    
+    if (shouldProcessPayment) {
       
       // Extract userId from order_id
       const [userId] = (data.order_id || '').split('_');
@@ -45,19 +64,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
       }
       
-      // Use the invoice amount for credits
-      // Even if partially paid, if they paid at least 95%, give them full credits
+      // Always use the invoice amount for credits when payment is accepted
+      // This ensures users get what they paid for, even with rounding issues
       let amountToCredit = parseFloat(data.price_amount);
       
       if (data.payment_status === 'partially_paid') {
-        console.log(`Partially paid: expected ${data.price_amount}, received ${data.actually_paid}`);
-        // If they paid less than 95%, only credit what they paid
-        if (!isPartiallyPaidEnough && data.actually_paid) {
-          amountToCredit = parseFloat(data.actually_paid);
-          console.log(`Payment insufficient, crediting only: ${amountToCredit}`);
-        } else {
-          console.log(`Payment sufficient (>=95%), crediting full amount: ${amountToCredit}`);
-        }
+        console.log(`Partially paid but accepted: expected ${data.price_amount}, received ${data.actually_paid}`);
+        console.log(`Crediting full invoice amount: ${amountToCredit} USDT`);
       }
       
       // Round to 2 decimal places
