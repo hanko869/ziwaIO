@@ -34,9 +34,50 @@ const ContactExtractorSubscription: React.FC = () => {
     initializeApiKeys();
   }, []);
 
-  // Load contacts from localStorage and check API configuration on component mount
+  // Function to fetch contacts from database
+  const fetchContactsFromDatabase = async () => {
+    if (!user?.id) {
+      setContacts([]); // No user, no contacts
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/contacts?userId=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        const dbContacts = data.contacts || [];
+        
+        // Transform database contacts to match our Contact interface
+        const transformedContacts: Contact[] = dbContacts.map((dbContact: any) => ({
+          id: dbContact.id,
+          linkedinUrl: dbContact.linkedin_url,
+          name: dbContact.name,
+          emails: dbContact.emails || [],
+          phones: dbContact.phones || [],
+          extractedAt: dbContact.extracted_at,
+          jobTitle: dbContact.job_title,
+          company: dbContact.company,
+          location: dbContact.location
+        }));
+        
+        setContacts(transformedContacts);
+      } else {
+        console.error('Failed to fetch contacts:', response.status);
+        setContacts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+      setContacts([]);
+    }
+  };
+
+  // Load contacts from database and check API configuration on component mount
   useEffect(() => {
-    setContacts(getStoredContacts());
+    // Clear any old localStorage data
+    clearStoredContacts(user?.id);
+    
+    // Load contacts from database
+    fetchContactsFromDatabase();
     
     // Check API configuration for Wiza
     checkAPIConfiguration().then(configured => {
@@ -45,7 +86,7 @@ const ContactExtractorSubscription: React.FC = () => {
     
     // Fetch user's credit balance
     fetchCreditBalance();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     fetchCreditBalance();
@@ -147,8 +188,8 @@ const ContactExtractorSubscription: React.FC = () => {
       const result = await extractContactFromLinkedIn(linkedinUrl, user?.id);
       
       if (result.success && result.contact) {
-        saveContact(result.contact);
-        setContacts(getStoredContacts());
+        // Add the new contact to state (database save happens in extraction)
+        setContacts(prev => [...prev, result.contact!]);
         setLinkedinUrl('');
         
         // Refresh credit balance after extraction
@@ -326,7 +367,8 @@ const ContactExtractorSubscription: React.FC = () => {
         }
       }
 
-      setContacts(getStoredContacts());
+      // Refresh contacts from database after bulk extraction
+      await fetchContactsFromDatabase();
       
       let message = interpolate(t.feedback.bulkSuccess, { success: successCount });
       if (failedCount > 0) {
@@ -360,7 +402,7 @@ const ContactExtractorSubscription: React.FC = () => {
       downloadCSV(csvContent, `linkedin_contacts_${timestamp}.csv`);
       
       // Clear all data after successful download
-      clearStoredContacts();
+      clearStoredContacts(user?.id);
       setContacts([]);
       showFeedback('success', interpolate(t.feedback.downloadSuccess, { count: contacts.length }));
     } catch (error) {
@@ -576,8 +618,12 @@ const ContactExtractorSubscription: React.FC = () => {
               {contacts.some(contact => !contact.email && !contact.phone) && (
                 <button
                   onClick={() => {
-                    const contactsWithInfo = contacts.filter(contact => contact.email || contact.phone);
-                    localStorage.setItem('linkedin_contacts', JSON.stringify(contactsWithInfo));
+                    const contactsWithInfo = contacts.filter(contact => 
+                      (contact.emails && contact.emails.length > 0) || 
+                      (contact.phones && contact.phones.length > 0) ||
+                      contact.email || 
+                      contact.phone
+                    );
                     setContacts(contactsWithInfo);
                     showFeedback('info', t.feedback.removedContacts);
                   }}
