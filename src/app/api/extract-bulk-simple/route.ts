@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractContactsInParallel } from '@/utils/parallelExtraction';
 import { initializeApiKeys } from '@/utils/apiKeyLoader';
 import { getApiKeyPool } from '@/utils/apiKeyPool';
-import { creditService } from '@/lib/credits';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,27 +15,16 @@ export async function POST(request: NextRequest) {
     }
     
     // Initialize API keys on server side where all env vars are accessible
+    console.log('Initializing API keys from environment...');
+    console.log('WIZA_API_KEY exists:', !!process.env.WIZA_API_KEY);
+    console.log('WIZA_API_KEY_2 exists:', !!process.env.WIZA_API_KEY_2);
+    console.log('WIZA_API_KEY_3 exists:', !!process.env.WIZA_API_KEY_3);
+    
     initializeApiKeys();
     const apiKeyPool = getApiKeyPool();
     const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
     
     console.log(`Server: Starting bulk extraction with ${availableKeys} API keys for ${urls.length} URLs`);
-    
-    // Check user credits if userId provided
-    if (userId) {
-      try {
-        const hasCredits = await creditService.hasEnoughCredits(userId, urls.length);
-        if (!hasCredits) {
-          return NextResponse.json(
-            { error: 'Insufficient credits' },
-            { status: 402 }
-          );
-        }
-      } catch (creditError) {
-        console.error('Credit check error:', creditError);
-        // Continue without credit check for now
-      }
-    }
     
     // Process extraction with all available API keys
     const results = await extractContactsInParallel(urls, {
@@ -50,7 +38,7 @@ export async function POST(request: NextRequest) {
     let totalEmails = 0;
     let totalPhones = 0;
     
-    results.forEach((result, index) => {
+    results.forEach((result) => {
       if (result.success && result.contact) {
         successCount++;
         // Our pricing: 1 credit per email, 2 credits per phone
@@ -65,14 +53,14 @@ export async function POST(request: NextRequest) {
     // Deduct credits if userId provided
     if (userId && creditsUsed > 0) {
       try {
+        // Import creditService
+        const { creditService } = await import('@/lib/credits');
         await creditService.deductCredits(userId, creditsUsed, 'bulk_extraction');
         console.log(`Bulk extraction: Deducted ${creditsUsed} credits for ${totalEmails} email(s) x 1 + ${totalPhones} phone(s) x 2`);
       } catch (creditError) {
         console.error('Credit deduction error:', creditError);
-        // Continue without deducting credits for now
+        // Continue without deducting credits
       }
-    } else if (creditsUsed === 0) {
-      console.log('No credits deducted - no emails or phones found in bulk extraction');
     }
     
     // Log final API key usage
@@ -86,7 +74,6 @@ export async function POST(request: NextRequest) {
         total: urls.length,
         successful: successCount,
         failed: urls.length - successCount,
-        creditsUsed,
         apiKeysUsed: availableKeys
       }
     });

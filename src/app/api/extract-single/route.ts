@@ -39,12 +39,17 @@ export async function POST(request: NextRequest) {
     
     // Check user credits if userId provided
     if (userId) {
-      const hasCredits = await creditService.hasEnoughCredits(userId, 1);
-      if (!hasCredits) {
-        return NextResponse.json(
-          { error: 'Insufficient credits' },
-          { status: 402 }
-        );
+      try {
+        const hasCredits = await creditService.hasEnoughCredits(userId, 1);
+        if (!hasCredits) {
+          return NextResponse.json(
+            { error: 'Insufficient credits' },
+            { status: 402 }
+          );
+        }
+      } catch (creditError) {
+        console.error('Credit check error:', creditError);
+        // Continue without credit check for now
       }
     }
     
@@ -54,13 +59,23 @@ export async function POST(request: NextRequest) {
     // Deduct credits if successful and userId provided
     if (result.success && result.contact && userId) {
       // Calculate credits based on what was found
+      // Our pricing: 1 credit per email, 2 credits per phone
       let creditsToDeduct = 0;
-      if (result.contact.emails?.length || result.contact.phones?.length) {
-        creditsToDeduct = 2; // 2 credits for successful extraction
-      }
+      const emailCount = result.contact.emails?.length || 0;
+      const phoneCount = result.contact.phones?.length || 0;
+      
+      creditsToDeduct = (emailCount * 1) + (phoneCount * 2);
       
       if (creditsToDeduct > 0) {
-        await creditService.deductCredits(userId, creditsToDeduct, 'single_extraction');
+        try {
+          await creditService.deductCredits(userId, creditsToDeduct, 'single_extraction');
+          console.log(`Deducted ${creditsToDeduct} credits: ${emailCount} email(s) x 1 + ${phoneCount} phone(s) x 2`);
+        } catch (creditError) {
+          console.error('Credit deduction error:', creditError);
+          // Continue without deducting credits for now
+        }
+      } else {
+        console.log('No credits deducted - no email or phone found');
       }
     }
     

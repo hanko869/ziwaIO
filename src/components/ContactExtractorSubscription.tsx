@@ -252,7 +252,7 @@ const ContactExtractorSubscription: React.FC = () => {
         console.log('Starting bulk extraction via server API...');
         
         // Use server-side API endpoint for bulk extraction
-        const response = await fetch('/api/extract-bulk', {
+        const response = await fetch('/api/extract-bulk-simple', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -539,7 +539,7 @@ const ContactExtractorSubscription: React.FC = () => {
           <div className="mt-6 bg-purple-50 rounded-xl p-4 text-sm">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <p className="text-purple-900 font-medium">Successful extraction (Email + Phone): 2 credits ($0.20 USD)</p>
+                                     <p className="text-purple-900 font-medium">Email: 1 credit | Phone: 2 credits</p>
                 <p className="text-purple-700">No charge if no results found</p>
               </div>
               <div className="text-right">
