@@ -4,6 +4,7 @@ import { initializeApiKeys } from '@/utils/apiKeyLoader';
 import { getApiKeyPool } from '@/utils/apiKeyPool';
 import { creditService } from '@/lib/credits';
 import { isValidLinkedInUrl } from '@/utils/extraction';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Extract contact using the selected API key
     const result = await extractContactWithWiza(url, apiKey);
     
-    // Deduct credits if successful and userId provided
+    // Save to database and deduct credits if successful and userId provided
     if (result.success && result.contact && userId) {
       // Calculate credits based on what was found
       // Our pricing: 1 credit per email, 2 credits per phone
@@ -75,6 +76,39 @@ export async function POST(request: NextRequest) {
       
       creditsToDeduct = (emailCount * 1) + (phoneCount * 2);
       
+      // Save to database
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      
+      if (supabaseUrl && supabaseKey) {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        try {
+          const { error } = await supabase
+            .from('extracted_contacts')
+            .insert({
+              user_id: userId,
+              linkedin_url: result.contact.linkedinUrl,
+              name: result.contact.name,
+              emails: result.contact.emails || [],
+              phones: result.contact.phones || [],
+              job_title: result.contact.jobTitle,
+              company: result.contact.company,
+              location: result.contact.location,
+              credits_used: creditsToDeduct,
+              extracted_at: new Date().toISOString()
+            });
+            
+          if (error) {
+            console.error('Error saving contact to database:', error);
+          } else {
+            console.log('Contact saved to database successfully');
+          }
+        } catch (dbError) {
+          console.error('Database save error:', dbError);
+        }
+      }
+      
+      // Deduct credits
       if (creditsToDeduct > 0) {
         try {
           await creditService.deductCredits(userId, creditsToDeduct, 'single_extraction');

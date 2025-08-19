@@ -303,6 +303,9 @@ const ContactExtractorSubscription: React.FC = () => {
       try {
         console.log('Starting bulk extraction via server API...');
         
+        // Show initial progress
+        setBulkProgress({ current: 0, total: validUrls.length });
+        
         // Use server-side API endpoint for bulk extraction
         const response = await fetch('/api/extract-bulk-simple', {
           method: 'POST',
@@ -324,21 +327,27 @@ const ContactExtractorSubscription: React.FC = () => {
         console.log('Bulk extraction completed:', data.stats);
         
         // Process results
-        data.results.forEach((result: any, index: number) => {
-          if (result.success && result.contact) {
-            extractedContacts.push(result.contact);
-            saveContact(result.contact);
-            successCount++;
-          } else {
-            failedCount++;
-            console.error(`Failed to extract ${validUrls[index]}:`, result.error);
-          }
+        if (data.results && Array.isArray(data.results)) {
+          // Update progress to show completion
+          setBulkProgress({ current: validUrls.length, total: validUrls.length });
           
-          // Update progress
-          setBulkProgress({ current: index + 1, total: validUrls.length });
-        });
-
-        console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);
+          data.results.forEach((result: any, index: number) => {
+            if (result.success && result.contact) {
+              extractedContacts.push(result.contact);
+              successCount++;
+            } else {
+              failedCount++;
+              console.error(`Failed to extract ${validUrls[index]}:`, result.error);
+            }
+          });
+          
+          console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);
+          
+          // Add extracted contacts to the UI state immediately
+          if (extractedContacts.length > 0) {
+            setContacts(prev => [...prev, ...extractedContacts]);
+          }
+        }
         
       } catch (error) {
         console.error('Parallel extraction error:', error);
@@ -349,10 +358,9 @@ const ContactExtractorSubscription: React.FC = () => {
           setBulkProgress({ current: i + 1, total: validUrls.length });
           
           try {
-            const result = await extractContactFromLinkedIn(validUrls[i]);
+            const result = await extractContactFromLinkedIn(validUrls[i], user?.id);
             if (result.success && result.contact) {
               extractedContacts.push(result.contact);
-              saveContact(result.contact);
               successCount++;
             } else {
               failedCount++;

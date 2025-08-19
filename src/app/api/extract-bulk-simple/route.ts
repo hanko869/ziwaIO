@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractContactsInParallel } from '@/utils/parallelExtraction';
 import { initializeApiKeys } from '@/utils/apiKeyLoader';
 import { getApiKeyPool } from '@/utils/apiKeyPool';
+import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +39,17 @@ export async function POST(request: NextRequest) {
     let totalEmails = 0;
     let totalPhones = 0;
     
-    results.forEach((result) => {
+    // Save contacts to database if userId provided
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    let supabase = null;
+    
+    if (supabaseUrl && supabaseKey && userId) {
+      supabase = createClient(supabaseUrl, supabaseKey);
+    }
+    
+    // Process results and save to database
+    for (const result of results) {
       if (result.success && result.contact) {
         successCount++;
         // Our pricing: 1 credit per email, 2 credits per phone
@@ -47,8 +58,34 @@ export async function POST(request: NextRequest) {
         totalEmails += emailCount;
         totalPhones += phoneCount;
         creditsUsed += (emailCount * 1) + (phoneCount * 2);
+        
+        // Save to database if we have supabase client and userId
+        if (supabase && userId) {
+          try {
+            const { error } = await supabase
+              .from('extracted_contacts')
+              .insert({
+                user_id: userId,
+                linkedin_url: result.contact.linkedinUrl,
+                name: result.contact.name,
+                emails: result.contact.emails || [],
+                phones: result.contact.phones || [],
+                job_title: result.contact.jobTitle,
+                company: result.contact.company,
+                location: result.contact.location,
+                credits_used: (emailCount * 1) + (phoneCount * 2),
+                extracted_at: new Date().toISOString()
+              });
+              
+            if (error) {
+              console.error('Error saving contact to database:', error);
+            }
+          } catch (dbError) {
+            console.error('Database save error:', dbError);
+          }
+        }
       }
-    });
+    }
     
     // Deduct credits if userId provided
     if (userId && creditsUsed > 0) {
