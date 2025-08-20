@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Users, DollarSign, Activity, Settings, LogOut, Key } from 'lucide-react';
+import { BarChart3, Users, DollarSign, Activity, Settings, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import UserManagement from './UserManagement';
 import ActivityLog from './ActivityLog';
 import Statistics from './Statistics';
 import SystemSettings from './SystemSettings';
-import ApiKeyStatus from './ApiKeyStatus';
 import CreditManagement from './CreditManagement';
 
 export default function AdminDashboard() {
@@ -159,16 +158,6 @@ export default function AdminDashboard() {
                 Settings
               </button>
               <button
-                onClick={() => setActiveTab('api-keys')}
-                className={`py-2 px-6 border-b-2 font-medium text-sm ${
-                  activeTab === 'api-keys'
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                API Keys
-              </button>
-              <button
                 onClick={() => setActiveTab('credits')}
                 className={`py-2 px-6 border-b-2 font-medium text-sm ${
                   activeTab === 'credits'
@@ -186,7 +175,6 @@ export default function AdminDashboard() {
             {activeTab === 'users' && <UserManagement />}
             {activeTab === 'activity' && <ActivityLog />}
             {activeTab === 'settings' && <SystemSettings />}
-            {activeTab === 'api-keys' && <ApiKeyStatus />}
             {activeTab === 'credits' && <CreditManagement />}
           </div>
         </div>
