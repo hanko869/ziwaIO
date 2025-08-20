@@ -95,7 +95,9 @@ export class ParallelExtractionQueue {
 
   // Process a batch of tasks in parallel
   private async processBatch(batch: ExtractionTask[]): Promise<void> {
+    console.log(`\n=== STARTING NEW BATCH ===`);
     console.log(`Processing batch of ${batch.length} tasks in parallel`);
+    console.log(`All tasks will start simultaneously using different API keys`);
     const startTime = Date.now();
     const promises = batch.map(task => this.processTask(task));
     await Promise.all(promises);
@@ -106,7 +108,8 @@ export class ParallelExtractionQueue {
   // Process individual task
   private async processTask(task: ExtractionTask): Promise<void> {
     this.running++;
-    console.log(`Processing ${task.url} with API key ${task.apiKey.substring(0, 10)}...`);
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] START: Processing ${task.url} with API key ${task.apiKey.substring(0, 10)}...`);
 
     try {
       // Use the specific API key for this task
@@ -114,7 +117,8 @@ export class ParallelExtractionQueue {
       
       this.results.set(task.url, result);
       this.completed++;
-      console.log(`Completed ${task.url}: ${result.success ? 'success' : 'failed'}`);
+      const endTimestamp = new Date().toISOString();
+      console.log(`[${endTimestamp}] END: Completed ${task.url}: ${result.success ? 'success' : 'failed'}`);
 
       // Report progress
       if (this.options.onProgress) {
