@@ -304,12 +304,21 @@ const ContactExtractorSubscription: React.FC = () => {
       // Show initial progress immediately
       setBulkProgress({ current: 0, total: validUrls.length });
       console.log('Set bulk progress:', { current: 0, total: validUrls.length });
+      
+      let progressInterval: NodeJS.Timeout | null = null;
 
       try {
         console.log('Starting bulk extraction via server API...');
         
         // Add small delay to ensure UI updates
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Start a progress simulation since server doesn't provide real-time updates
+        let simulatedProgress = 0;
+        progressInterval = setInterval(() => {
+          simulatedProgress = Math.min(simulatedProgress + 10, 90); // Go up to 90%
+          setBulkProgress({ current: Math.floor((simulatedProgress / 100) * validUrls.length), total: validUrls.length });
+        }, 500); // Update every 500ms
         
         // Use server-side API endpoint for bulk extraction
         const response = await fetch('/api/extract-bulk-simple', {
@@ -325,11 +334,15 @@ const ContactExtractorSubscription: React.FC = () => {
         
         if (!response.ok) {
           const error = await response.json();
+          if (progressInterval) clearInterval(progressInterval);
           throw new Error(error.error || 'Bulk extraction failed');
         }
         
         const data = await response.json();
         console.log('Bulk extraction completed:', data.stats);
+        
+        // Clear the progress interval
+        if (progressInterval) clearInterval(progressInterval);
         
         // Process results
         if (data.results && Array.isArray(data.results)) {
@@ -355,6 +368,7 @@ const ContactExtractorSubscription: React.FC = () => {
         
       } catch (error) {
         console.error('Parallel extraction error:', error);
+        if (progressInterval) clearInterval(progressInterval);
         // Fallback to sequential processing if parallel fails
         console.log('Falling back to sequential processing...');
         
@@ -589,7 +603,6 @@ const ContactExtractorSubscription: React.FC = () => {
               </div>
 
               {/* Progress Bar */}
-              {console.log('Rendering progress bar:', bulkProgress)}
               {bulkProgress && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-gray-600">
