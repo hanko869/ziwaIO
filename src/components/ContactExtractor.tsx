@@ -212,7 +212,7 @@ const ContactExtractor: React.FC = () => {
     }
   };
 
-  const handleDownloadCSV = () => {
+  const handleDownloadCSV = async () => {
     if (contacts.length === 0) {
       showFeedback('error', t.feedback.noContactsDownload);
       return;
@@ -223,7 +223,7 @@ const ContactExtractor: React.FC = () => {
       const timestamp = new Date().toISOString().split('T')[0];
       downloadCSV(csvContent, `linkedin_contacts_${timestamp}.csv`);
       
-      // Clear all data after successful download
+      // Clear all data after successful download (no DB in non-subscription view)
       clearStoredContacts();
       setContacts([]);
       showFeedback('success', interpolate(t.feedback.downloadSuccess, { count: contacts.length }));

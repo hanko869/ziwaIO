@@ -108,3 +108,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 
+
+// Delete all user's extracted contacts (used after CSV download)
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!supabase) {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('extracted_contacts')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error deleting contacts:', error);
+      return NextResponse.json({ error: 'Failed to delete contacts' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('API error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

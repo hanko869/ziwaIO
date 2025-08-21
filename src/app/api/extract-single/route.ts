@@ -68,13 +68,13 @@ export async function POST(request: NextRequest) {
     
     // Save to database and deduct credits if successful and userId provided
     if (result.success && result.contact && userId) {
-      // Calculate credits based on what was found
-      // Our pricing: 1 credit per email, 2 credits per phone
+      // Calculate credits based on what was found (phone-only pricing)
+      // Phone: 2 credits each. We no longer charge for email.
       let creditsToDeduct = 0;
-      const emailCount = result.contact.emails?.length || 0;
+      const emailCount = 0;
       const phoneCount = result.contact.phones?.length || 0;
       
-      creditsToDeduct = (emailCount * 1) + (phoneCount * 2);
+      creditsToDeduct = phoneCount * 2;
       
       // Save to database
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
               user_id: userId,
               linkedin_url: result.contact.linkedinUrl,
               name: result.contact.name,
-              emails: result.contact.emails || [],
+              emails: [],
               phones: result.contact.phones || [],
               job_title: result.contact.jobTitle,
               company: result.contact.company,

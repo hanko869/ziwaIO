@@ -194,10 +194,11 @@ const createWizaList = async (linkedinUrl: string, apiKeyOverride?: string): Pro
   const payload = {
     list: {
       name: listName,
-      enrichment_level: 'full',  // Changed to 'full' to get phone numbers
+      // Lists API does not support 'phone' only; we do not rely on lists for extraction anymore.
+      enrichment_level: 'partial',
       email_options: {
-        accept_work: true,
-        accept_personal: true,
+        accept_work: false,
+        accept_personal: false,
         accept_generic: false
       },
       items: [
@@ -385,11 +386,8 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
       individual_reveal: {
         profile_url: linkedinUrl
       },
-      enrichment_level: 'full',
-      email_options: {
-        accept_work: true,
-        accept_personal: true
-      }
+      // Phone-only to avoid email credit charges
+      enrichment_level: 'phone'
     };
 
     console.log('Creating Individual Reveal with payload:', JSON.stringify(payload, null, 2));
@@ -461,24 +459,8 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
           console.log(JSON.stringify(status.data, null, 2));
           console.log('=== END INDIVIDUAL REVEAL OBJECT ===');
 
-          // Extract ALL emails
+          // We are phone-only: do not collect emails to avoid email credit usage
           const allEmails: string[] = [];
-          
-          // Add primary email if exists
-          if (status.data.email) {
-            allEmails.push(status.data.email);
-          }
-          
-          // Add all emails from emails array
-          if (status.data.emails && Array.isArray(status.data.emails)) {
-            status.data.emails.forEach((emailObj: any) => {
-              if (emailObj.email && !allEmails.includes(emailObj.email)) {
-                allEmails.push(emailObj.email);
-              }
-            });
-          }
-          
-          console.log('All emails found:', allEmails);
           
           // Extract ALL phone numbers
           const allPhones: string[] = [];
@@ -519,8 +501,9 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
             id: generateContactId(),
             linkedinUrl,
             name: status.data.name || 'Unknown Contact',
-            email: allEmails[0], // Primary email for backward compatibility
-            emails: allEmails.length > 0 ? allEmails : undefined,
+            // Omit emails in phone-only mode
+            email: undefined,
+            emails: undefined,
             phone: allPhones[0], // Primary phone for backward compatibility
             phones: allPhones.length > 0 ? allPhones : undefined,
             extractedAt: new Date().toISOString(),
@@ -703,11 +686,8 @@ const createIndividualReveal = async (linkedinUrl: string, apiKeyOverride?: stri
     individual_reveal: {
       profile_url: linkedinUrl
     },
-    enrichment_level: 'full', // Try full instead of partial
-    email_options: {
-      accept_work: true,
-      accept_personal: true
-    }
+    // Phone-only to avoid email credit charges
+    enrichment_level: 'phone'
   };
 
   console.log('Creating Individual Reveal with payload:', JSON.stringify(payload, null, 2));
@@ -797,24 +777,8 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiK
           console.log(JSON.stringify(status.data, null, 2));
           console.log('=== END INDIVIDUAL REVEAL OBJECT ===');
 
-          // Extract ALL emails
+          // Phone-only: skip collecting emails
           const allEmails: string[] = [];
-          
-          // Add primary email if exists
-          if (status.data.email) {
-            allEmails.push(status.data.email);
-          }
-          
-          // Add all emails from emails array
-          if (status.data.emails && Array.isArray(status.data.emails)) {
-            status.data.emails.forEach((emailObj: any) => {
-              if (emailObj.email && !allEmails.includes(emailObj.email)) {
-                allEmails.push(emailObj.email);
-              }
-            });
-          }
-          
-          console.log('All emails found:', allEmails);
           
           // Extract ALL phone numbers
           const allPhones: string[] = [];
@@ -855,8 +819,8 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiK
             id: generateContactId(),
             linkedinUrl,
             name: status.data.name || 'Unknown Contact',
-            email: allEmails[0], // Primary email for backward compatibility
-            emails: allEmails.length > 0 ? allEmails : undefined,
+            email: undefined,
+            emails: undefined,
             phone: allPhones[0], // Primary phone for backward compatibility
             phones: allPhones.length > 0 ? allPhones : undefined,
             extractedAt: new Date().toISOString(),

@@ -296,104 +296,40 @@ const ContactExtractorSubscription: React.FC = () => {
 
       setIsExtracting(true);
       
-      // Use parallel extraction with multiple API keys
+      // Use client-managed concurrency and update real progress per completed URL
+      const concurrency = 6;
       let successCount = 0;
       let failedCount = 0;
+      let processedCount = 0;
       const extractedContacts: Contact[] = [];
-      
-      // Show initial progress immediately
       setBulkProgress({ current: 0, total: validUrls.length });
-      console.log('Set bulk progress:', { current: 0, total: validUrls.length });
-      
-      let progressInterval: NodeJS.Timeout | null = null;
 
-      try {
-        console.log('Starting bulk extraction via server API...');
-        
-        // Add small delay to ensure UI updates
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Start a progress simulation since server doesn't provide real-time updates
-        let simulatedProgress = 0;
-        progressInterval = setInterval(() => {
-          simulatedProgress = Math.min(simulatedProgress + 10, 90); // Go up to 90%
-          setBulkProgress({ current: Math.floor((simulatedProgress / 100) * validUrls.length), total: validUrls.length });
-        }, 500); // Update every 500ms
-        
-        // Use server-side API endpoint for bulk extraction
-        const response = await fetch('/api/extract-bulk-simple', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            urls: validUrls,
-            userId: user?.id
-          })
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          if (progressInterval) clearInterval(progressInterval);
-          throw new Error(error.error || 'Bulk extraction failed');
-        }
-        
-        const data = await response.json();
-        console.log('Bulk extraction completed:', data.stats);
-        
-        // Clear the progress interval
-        if (progressInterval) clearInterval(progressInterval);
-        
-        // Process results
-        if (data.results && Array.isArray(data.results)) {
-          // Update progress to show completion
-          setBulkProgress({ current: validUrls.length, total: validUrls.length });
-          console.log('Updated bulk progress to completion');
-          
-          data.results.forEach((result: any, index: number) => {
-            if (result.success && result.contact) {
-              extractedContacts.push(result.contact);
-              successCount++;
-            } else {
-              failedCount++;
-              console.error(`Failed to extract ${validUrls[index]}:`, result.error);
-            }
-          });
-          
-          console.log(`Parallel extraction completed: ${successCount} success, ${failedCount} failed`);
-        }
-        
-        // Log the extracted contacts
-        console.log('Extracted contacts from server:', extractedContacts);
-        
-      } catch (error) {
-        console.error('Parallel extraction error:', error);
-        if (progressInterval) clearInterval(progressInterval);
-        // Fallback to sequential processing if parallel fails
-        console.log('Falling back to sequential processing...');
-        
-        for (let i = 0; i < validUrls.length; i++) {
-          setBulkProgress({ current: i + 1, total: validUrls.length });
-          
+      const queue: string[] = [...validUrls];
+
+      const worker = async () => {
+        while (queue.length > 0) {
+          const url = queue.shift()!;
           try {
-            const result = await extractContactFromLinkedIn(validUrls[i], user?.id);
+            const result = await extractContactFromLinkedIn(url, user?.id);
             if (result.success && result.contact) {
               extractedContacts.push(result.contact);
               successCount++;
             } else {
               failedCount++;
             }
-          } catch (error) {
-            console.error(`Failed to extract contact from ${validUrls[i]}:`, error);
+          } catch (err) {
+            console.error('Extraction error:', err);
             failedCount++;
-          }
-          
-          // Add a small delay between requests to avoid rate limiting
-          if (i < validUrls.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
+          } finally {
+            processedCount += 1;
+            setBulkProgress({ current: processedCount, total: validUrls.length });
           }
         }
-      }
+      };
+
+      // Launch workers
+      const workers = Array.from({ length: Math.min(concurrency, validUrls.length) }, () => worker());
+      await Promise.all(workers);
 
       // Wait a moment for database writes to complete
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -424,7 +360,7 @@ const ContactExtractorSubscription: React.FC = () => {
     }
   };
 
-  const handleDownloadCSV = () => {
+  const handleDownloadCSV = async () => {
     if (contacts.length === 0) {
       showFeedback('error', t.feedback.noContactsDownload);
       return;
@@ -435,7 +371,14 @@ const ContactExtractorSubscription: React.FC = () => {
       const timestamp = new Date().toISOString().split('T')[0];
       downloadCSV(csvContent, `linkedin_contacts_${timestamp}.csv`);
       
-      // Clear all data after successful download
+      // Clear all data after successful download (DB + client)
+      if (user?.id) {
+        try {
+          await fetch(`/api/contacts?userId=${user.id}`, { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to delete contacts from DB:', e);
+        }
+      }
       clearStoredContacts(user?.id);
       setContacts([]);
       showFeedback('success', interpolate(t.feedback.downloadSuccess, { count: contacts.length }));
