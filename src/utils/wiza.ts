@@ -876,12 +876,13 @@ export const searchProspects = async (
   lastName?: string,
   jobTitle?: string,
   location?: string,
-  size: number = 20
+  size: number = 20,
+  apiKey?: string
 ): Promise<ProspectSearchResponse> => {
-  const apiKey = process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
+  const key = apiKey || process.env.WIZA_API_KEY || 'c951d1f0b91ab7e5afe187fa747f3668524ad5e2eba2c68a912654b43682cab8';
   const baseUrl = process.env.WIZA_BASE_URL || 'https://wiza.co';
 
-  if (!apiKey) {
+  if (!key) {
     throw new Error('Wiza API key not configured');
   }
 
@@ -949,7 +950,7 @@ export const searchProspects = async (
   const response = await fetch(`${baseUrl}/api/prospects/search`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload)

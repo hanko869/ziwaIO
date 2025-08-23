@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchProspects } from '@/utils/wiza';
+import { initializeApiKeys } from '@/utils/apiKeyLoader';
+import { getApiKeyPool } from '@/utils/apiKeyPool';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,13 +26,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call Wiza prospect search
+    // Initialize API keys and get one from the pool
+    initializeApiKeys();
+    const apiKeyPool = getApiKeyPool();
+    const apiKey = apiKeyPool?.getNextKey();
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'No API keys available' },
+        { status: 503 }
+      );
+    }
+
+    // Call Wiza prospect search with API key
     const searchResults = await searchProspects(
       firstName,
       lastName,
       jobTitle,
       location,
-      size
+      size,
+      apiKey
     );
 
     console.log('Wiza search response:', {
