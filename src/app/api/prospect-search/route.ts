@@ -1,175 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// ProxyCurl API integration example
-// You would need to sign up at https://proxycurl.com and get an API key
-const PROXYCURL_API_KEY = process.env.PROXYCURL_API_KEY || '';
-
-async function searchLinkedInProfiles(criteria: any) {
-  // If no API key, return mock data
-  if (!PROXYCURL_API_KEY) {
-    return generateMockProfiles(criteria);
-  }
-
-  try {
-    // ProxyCurl person search endpoint
-    const searchParams = new URLSearchParams();
-    
-    // Build search query
-    if (criteria.location) {
-      searchParams.append('country', criteria.location);
-    }
-    
-    // ProxyCurl uses different parameters, this is an example
-    // Actual implementation would map your criteria to their API format
-    const response = await fetch(
-      `https://api.proxycurl.com/api/v2/search/person?${searchParams.toString()}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${PROXYCURL_API_KEY}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('ProxyCurl API error');
-    }
-
-    const data = await response.json();
-    
-    // Transform ProxyCurl results to match our format
-    return data.results.map((person: any, index: number) => ({
-      id: String(index + 1),
-      name: person.full_name || 'Unknown',
-      headline: person.headline || person.occupation || '',
-      location: person.location || '',
-      profileUrl: person.linkedin_url || '',
-      experience: person.experiences?.[0]?.title || ''
-    }));
-    
-  } catch (error) {
-    console.error('ProxyCurl search error:', error);
-    // Fallback to mock data if API fails
-    return generateMockProfiles(criteria);
-  }
-}
-
-// Mock data for demonstration
-function generateMockProfiles(criteria: any) {
-  const allProfiles = [
-    {
-      id: '1',
-      name: 'John Smith',
-      headline: 'Senior Software Engineer at Tech Corp',
-      location: 'New York, NY',
-      profileUrl: 'https://linkedin.com/in/johnsmith',
-      experience: '6-10 years'
-    },
-    {
-      id: '2', 
-      name: 'Sarah Johnson',
-      headline: 'Product Manager | Building innovative solutions',
-      location: 'San Francisco, CA',
-      profileUrl: 'https://linkedin.com/in/sarahjohnson',
-      experience: '3-5 years'
-    },
-    {
-      id: '3',
-      name: 'Michael Chen',
-      headline: 'Data Scientist | Machine Learning Enthusiast',
-      location: 'Seattle, WA',
-      profileUrl: 'https://linkedin.com/in/michaelchen',
-      experience: '6-10 years'
-    },
-    {
-      id: '4',
-      name: 'Emily Davis',
-      headline: 'Marketing Director at Growth Startup',
-      location: 'Austin, TX',
-      profileUrl: 'https://linkedin.com/in/emilydavis',
-      experience: '11-15 years'
-    },
-    {
-      id: '5',
-      name: 'Robert Wilson',
-      headline: 'CEO & Founder | Serial Entrepreneur',
-      location: 'Boston, MA',
-      profileUrl: 'https://linkedin.com/in/robertwilson',
-      experience: '16+ years'
-    },
-    {
-      id: '6',
-      name: 'Lisa Anderson',
-      headline: 'UX Designer | Creating user-centric experiences',
-      location: 'New York, NY',
-      profileUrl: 'https://linkedin.com/in/lisaanderson',
-      experience: '3-5 years'
-    },
-    {
-      id: '7',
-      name: 'David Martinez',
-      headline: 'Sales Director | B2B SaaS Expert',
-      location: 'Chicago, IL',
-      profileUrl: 'https://linkedin.com/in/davidmartinez',
-      experience: '11-15 years'
-    },
-    {
-      id: '8',
-      name: 'Jennifer Lee',
-      headline: 'HR Manager | People & Culture Leader',
-      location: 'New York, NY',
-      profileUrl: 'https://linkedin.com/in/jenniferlee',
-      experience: '6-10 years'
-    }
-  ];
-
-  // Filter based on criteria
-  let filtered = [...allProfiles];
-  
-  if (criteria.location) {
-    filtered = filtered.filter(p => 
-      p.location.toLowerCase().includes(criteria.location.toLowerCase())
-    );
-  }
-  
-  if (criteria.experience) {
-    filtered = filtered.filter(p => p.experience === criteria.experience);
-  }
-  
-  // For age range, we can't filter mock data, but in real API this would be used
-  
-  return filtered;
-}
+import { searchProspects } from '@/utils/wiza';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { location, experience, ageRange } = body;
+    
+    // Extract search parameters from the request
+    const { 
+      firstName, 
+      lastName, 
+      jobTitle, 
+      location,
+      size = 20 // Default to 20 results
+    } = body;
 
-    console.log('Received search request:', { location, experience, ageRange });
+    console.log('Prospect search request:', { firstName, lastName, jobTitle, location, size });
 
-    // Search for profiles using either real API or mock data
-    const profiles = await searchLinkedInProfiles({ location, experience, ageRange });
+    // Validate at least one search parameter is provided
+    if (!firstName && !lastName && !jobTitle && !location) {
+      return NextResponse.json(
+        { error: 'At least one search parameter is required' },
+        { status: 400 }
+      );
+    }
 
-    // Simulate API delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Call Wiza prospect search
+    const searchResults = await searchProspects(
+      firstName,
+      lastName,
+      jobTitle,
+      location,
+      size
+    );
+
+    console.log('Wiza search response:', {
+      status: searchResults.status,
+      totalResults: searchResults.data?.total || 0,
+      profilesReturned: searchResults.data?.profiles?.length || 0
+    });
+
+    // Transform Wiza results to match our UI format
+    const profiles = searchResults.data?.profiles?.map((profile: any, index: number) => ({
+      id: `profile-${index}`,
+      name: profile.full_name || 'Unknown',
+      headline: profile.job_title || '',
+      location: profile.location_name || '',
+      profileUrl: profile.linkedin_url?.startsWith('http') 
+        ? profile.linkedin_url 
+        : `https://www.${profile.linkedin_url}`,
+      company: profile.job_company_name || '',
+      industry: profile.industry || ''
+    })) || [];
 
     return NextResponse.json({
       success: true,
-      profiles,
-      total: profiles.length,
-      searchCriteria: { location, experience, ageRange },
-      usingMockData: !PROXYCURL_API_KEY
+      total: searchResults.data?.total || 0,
+      profiles
     });
 
   } catch (error) {
     console.error('Prospect search error:', error);
+    
+    let errorMessage = 'Failed to search prospects';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // Handle specific Wiza API errors
+      if (error.message.includes('401')) {
+        errorMessage = 'API authentication failed. Please check your Wiza API key.';
+      } else if (error.message.includes('429')) {
+        errorMessage = 'Rate limit exceeded. Please try again later.';
+      } else if (error.message.includes('credits')) {
+        errorMessage = 'Insufficient API credits for prospect search.';
+      }
+    }
+    
     return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Failed to search prospects',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
+      { error: errorMessage },
       { status: 500 }
     );
   }
-} 
+}

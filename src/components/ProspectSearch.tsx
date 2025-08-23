@@ -5,9 +5,10 @@ import { FiSearch, FiDownload, FiCheck } from 'react-icons/fi';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SearchCriteria {
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
   location: string;
-  experience: string;
-  ageRange: string;
 }
 
 interface LinkedInProfile {
@@ -24,9 +25,10 @@ interface LinkedInProfile {
 export default function ProspectSearch() {
   const { t } = useLanguage();
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
-    location: '',
-    experience: '',
-    ageRange: ''
+    firstName: '',
+    lastName: '',
+    jobTitle: '',
+    location: ''
   });
   const [searchResults, setSearchResults] = useState<LinkedInProfile[]>([]);
   const [selectedProfiles, setSelectedProfiles] = useState<Set<string>>(new Set());
@@ -50,16 +52,24 @@ export default function ProspectSearch() {
       console.log('Response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.text();
+        const errorData = await response.json();
         console.error('Response error:', errorData);
-        throw new Error('Search failed');
+        throw new Error(errorData.error || 'Search failed');
       }
 
       const data = await response.json();
       console.log('Search results:', data);
-      setSearchResults(data.profiles || []);
+      
+      if (data.profiles && data.profiles.length > 0) {
+        setSearchResults(data.profiles);
+        setError(null);
+      } else {
+        setSearchResults([]);
+        setError('No profiles found matching your criteria');
+      }
     } catch (err) {
-      setError('Failed to search profiles. Please try again.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to search profiles';
+      setError(errorMessage);
       console.error('Search error:', err);
     } finally {
       setIsSearching(false);
@@ -100,7 +110,7 @@ export default function ProspectSearch() {
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold mb-6">LinkedIn Prospect Search</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Location
@@ -116,38 +126,41 @@ export default function ProspectSearch() {
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Years of Experience
+              First Name
             </label>
-            <select
-              value={searchCriteria.experience}
-              onChange={(e) => setSearchCriteria({ ...searchCriteria, experience: e.target.value })}
+            <input
+              type="text"
+              value={searchCriteria.firstName}
+              onChange={(e) => setSearchCriteria({ ...searchCriteria, firstName: e.target.value })}
+              placeholder="e.g., John"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            >
-              <option value="">Any</option>
-              <option value="0-2">0-2 years</option>
-              <option value="3-5">3-5 years</option>
-              <option value="6-10">6-10 years</option>
-              <option value="11-15">11-15 years</option>
-              <option value="16+">16+ years</option>
-            </select>
+            />
           </div>
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Age Range
+              Last Name
             </label>
-            <select
-              value={searchCriteria.ageRange}
-              onChange={(e) => setSearchCriteria({ ...searchCriteria, ageRange: e.target.value })}
+            <input
+              type="text"
+              value={searchCriteria.lastName}
+              onChange={(e) => setSearchCriteria({ ...searchCriteria, lastName: e.target.value })}
+              placeholder="e.g., Smith"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            >
-              <option value="">Any</option>
-              <option value="18-24">18-24</option>
-              <option value="25-34">25-34</option>
-              <option value="35-44">35-44</option>
-              <option value="45-54">45-54</option>
-              <option value="55+">55+</option>
-            </select>
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Job Title
+            </label>
+            <input
+              type="text"
+              value={searchCriteria.jobTitle}
+              onChange={(e) => setSearchCriteria({ ...searchCriteria, jobTitle: e.target.value })}
+              placeholder="e.g., Sales Manager, CEO"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
           </div>
         </div>
         
@@ -185,16 +198,7 @@ export default function ProspectSearch() {
             )}
           </div>
           
-          <div className="mb-4 p-4 bg-blue-50 text-blue-700 rounded-lg">
-            <p className="text-sm">
-              <strong>Note:</strong> Currently showing demo data. To use real LinkedIn search, you need to integrate with:
-            </p>
-            <ul className="text-sm mt-2 ml-4 list-disc">
-              <li>ProxyCurl API - $49/month for 1000 searches</li>
-              <li>Phantombuster - $30/month starter plan</li>
-              <li>Apify LinkedIn Scraper - $49/month</li>
-            </ul>
-          </div>
+
 
           <div className="space-y-4">
             {searchResults.map((profile) => (
