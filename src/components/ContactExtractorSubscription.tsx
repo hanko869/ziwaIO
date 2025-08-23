@@ -42,7 +42,7 @@ const ContactExtractorSubscription: React.FC = () => {
     }
     
     try {
-      const response = await fetch(`/api/contacts?userId=${user.id}&limit=1000`);
+      const response = await fetch(`/api/contacts?userId=${user.id}&limit=10000`);
       if (response.ok) {
         const data = await response.json();
         const dbContacts = data.data || [];
