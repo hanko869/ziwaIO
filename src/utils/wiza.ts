@@ -322,7 +322,7 @@ const getWizaContacts = async (listId: string, apiKeyOverride?: string): Promise
 // Wait for list to complete with polling (increased timeout)
 const waitForListCompletion = async (listId: string, maxWaitTime = 180000): Promise<WizaListStatusResponse> => {
   const startTime = Date.now();
-  const pollInterval = 5000; // Poll every 5 seconds (increased from 3)
+  const pollInterval = 2000; // Poll every 2 seconds for faster completion detection
 
   while (Date.now() - startTime < maxWaitTime) {
     try {
@@ -430,7 +430,7 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
     // Wait for completion
     const revealId = revealResponse.data.id.toString();
     const maxWaitTime = 180000; // 3 minutes
-    const pollInterval = 5000; // 5 seconds
+    const pollInterval = 2000; // 2 seconds for faster completion detection
     const startTime = Date.now();
 
     while (Date.now() - startTime < maxWaitTime) {
@@ -761,7 +761,7 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiK
     // Step 2: Wait for completion
     const revealId = revealResponse.data.id.toString();
     const maxWaitTime = 180000; // 3 minutes (increased timeout)
-    const pollInterval = 5000; // 5 seconds (consistent with list polling)
+    const pollInterval = 2000; // 2 seconds for faster completion detection
     const startTime = Date.now();
 
     while (Date.now() - startTime < maxWaitTime) {

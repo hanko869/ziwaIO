@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     
     // Process extraction with all available API keys
     const results = await extractContactsInParallel(urls, {
-      maxConcurrent: availableKeys * 2, // Use 2x concurrency for better utilization
-      delayBetweenBatches: 1000
+      maxConcurrent: availableKeys * 3, // Increased to 3x for better throughput
+      delayBetweenBatches: 0 // Removed delay for faster processing
     });
     
     // Count successful extractions and calculate credits

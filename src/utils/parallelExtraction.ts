@@ -24,7 +24,7 @@ export class ParallelExtractionQueue {
 
   constructor(options: ExtractionQueueOptions) {
     this.options = {
-      delayBetweenBatches: 1000, // Default 1 second between batches
+      delayBetweenBatches: 0, // No delay by default for faster processing
       ...options
     };
   }
@@ -177,7 +177,7 @@ export async function extractContactsInParallel(
   console.log('API Key Usage Before Extraction:', keyStats);
   
   const queue = new ParallelExtractionQueue({
-    maxConcurrent: availableKeys * 2, // Allow 2x concurrency to ensure all keys are used
+    maxConcurrent: availableKeys * 3, // Increased to 3x for better throughput
     ...options
   });
 
