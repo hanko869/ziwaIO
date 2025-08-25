@@ -82,13 +82,6 @@ export default function SystemSettings() {
           </button>
         </div>
       </div>
-      
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">API Configuration</h3>
-        <p className="text-sm text-gray-600">
-          API keys and sensitive configuration should be managed through environment variables.
-        </p>
-      </div>
     </div>
   );
 } 
