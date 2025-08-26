@@ -39,7 +39,7 @@ export const zh = {
   feedback: {
     enterUrl: '请输入LinkedIn个人资料URL',
     invalidUrl: '请输入有效的LinkedIn个人资料URL（例如：https://linkedin.com/in/username）',
-    apiNotConfigured: 'Wiza API未配置。请检查您的API密钥。',
+    apiNotConfigured: 'API未配置。请检查您的API密钥。',
     extracting: '正在提取联系人信息...',
     successExtract: '✅ 联系人提取成功！',
     foundDetails: '找到{{details}}！',

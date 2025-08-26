@@ -25,7 +25,7 @@ const ContactExtractor: React.FC = () => {
   useEffect(() => {
     setContacts(getStoredContacts());
     
-    // Check API configuration for Wiza
+    // Check API configuration
     checkAPIConfiguration().then(configured => {
       setApiConfigured(configured);
     });
@@ -543,7 +543,7 @@ const ContactExtractor: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Display education - Note: Not available from Wiza API */}
+                        {/* Display education - Note: Not available from API */}
                         {contact.education && (
                           <div className="flex items-center gap-2 text-gray-600">
                             <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

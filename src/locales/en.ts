@@ -39,7 +39,7 @@ export const en = {
   feedback: {
     enterUrl: 'Please enter a LinkedIn profile URL',
     invalidUrl: 'Please enter a valid LinkedIn profile URL (e.g., https://linkedin.com/in/username)',
-    apiNotConfigured: 'Wiza API is not configured. Please check your API key.',
+    apiNotConfigured: 'API is not configured. Please check your API key.',
     extracting: 'Extracting contact information...',
     successExtract: '✅ Contact extracted successfully!',
     foundDetails: 'Found {{details}}!',
