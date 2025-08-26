@@ -463,7 +463,7 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
           if (status.data.fail_error === 'billing_issue') {
             return {
               success: false,
-              error: 'Wiza API billing issue: Your Wiza account has a billing problem. Please check your Wiza account billing status at https://wiza.co/dashboard/billing or contact hello@wiza.co for assistance.'
+              error: 'Service temporarily unavailable. Please try again later or contact support. (Error: API credits issue)'
             };
           }
 
@@ -789,7 +789,7 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiK
           if (status.data.fail_error === 'billing_issue') {
             return {
               success: false,
-              error: 'Wiza API billing issue: Your Wiza account has a billing problem. Please check your Wiza account billing status at https://wiza.co/dashboard/billing or contact hello@wiza.co for assistance.'
+              error: 'Service temporarily unavailable. Please try again later or contact support. (Error: API credits issue)'
             };
           }
 

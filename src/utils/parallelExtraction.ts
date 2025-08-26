@@ -130,10 +130,11 @@ export class ParallelExtractionQueue {
         this.options.onTaskComplete(task.url, result, task.index);
       }
 
-      // Update API key credits if extraction failed due to credits
-      if (!result.success && result.error?.includes('credits')) {
+      // Update API key credits if extraction failed due to credits or billing
+      if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('API credits issue'))) {
         const apiKeyPool = getApiKeyPool();
         apiKeyPool?.markKeyUnavailable(task.apiKey);
+        console.log(`Marked API key ${task.apiKey.substring(0, 10)}... as unavailable due to: ${result.error}`);
       }
 
     } catch (error) {

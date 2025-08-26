@@ -103,6 +103,23 @@ export class ApiKeyPool {
   getAvailableKeysCount(): number {
     return Array.from(this.keyStatus.values()).filter(s => s.available).length;
   }
+  
+  // Reset availability of a specific key
+  resetKeyAvailability(key: string) {
+    const status = this.keyStatus.get(key);
+    if (status) {
+      status.available = true;
+      console.log(`Reset availability for API key ${key.substring(0, 10)}...`);
+    }
+  }
+  
+  // Reset all keys' availability (useful for retrying after some time)
+  resetAllKeysAvailability() {
+    this.keyStatus.forEach((status, key) => {
+      status.available = true;
+    });
+    console.log('Reset availability for all API keys');
+  }
 }
 
 // Singleton instance of API key pool

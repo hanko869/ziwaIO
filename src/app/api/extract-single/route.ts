@@ -66,6 +66,12 @@ export async function POST(request: NextRequest) {
     // Extract contact using the selected API key
     const result = await extractContactWithWiza(url, apiKey);
     
+    // Mark API key as unavailable if there's a billing/credits issue
+    if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('API credits issue'))) {
+      apiKeyPool?.markKeyUnavailable(apiKey);
+      console.log(`Marked API key ${apiKey.substring(0, 10)}... as unavailable due to: ${result.error}`);
+    }
+    
     // Save to database and deduct credits if successful and userId provided
     if (result.success && result.contact && userId) {
       // Calculate credits based on what was found (phone-only pricing)
