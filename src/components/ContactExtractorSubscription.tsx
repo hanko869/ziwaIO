@@ -253,7 +253,16 @@ const ContactExtractorSubscription: React.FC = () => {
           interpolate(t.feedback.foundDetails, { details: contactInfo.join(` ${t.feedback.and} `) }) : 
           t.feedback.limitedInfo;
         
-        showFeedback('success', `${t.feedback.successExtract} ${detailInfo}`);
+        const creditsUsed = emailCount * 1 + phoneCount * 2;
+        const successMessage = `✅ Extraction Successful!\n\n` +
+          `👤 ${result.contact.name || 'Unknown'}\n` +
+          `💼 ${result.contact.jobTitle || 'No title'} at ${result.contact.company || 'No company'}\n` +
+          `📍 ${result.contact.location || 'No location'}\n\n` +
+          `📧 Emails found: ${emailCount}\n` +
+          `📱 Phone numbers found: ${phoneCount}\n` +
+          `💰 Credits used: ${creditsUsed}`;
+        
+        showFeedback('success', successMessage);
       } else {
         showFeedback('error', result.error || t.feedback.failedExtract);
       }
@@ -354,6 +363,8 @@ const ContactExtractorSubscription: React.FC = () => {
       let successCount = 0;
       let failedCount = 0;
       let processedCount = 0;
+      let noContactCount = 0;
+      let errorCount = 0;
       const extractedContacts: Contact[] = [];
       setBulkProgress({ current: 0, total: validUrls.length });
 
@@ -366,13 +377,25 @@ const ContactExtractorSubscription: React.FC = () => {
             const result = await extractContactFromLinkedIn(url, user?.id);
             if (result.success && result.contact) {
               extractedContacts.push(result.contact);
-              successCount++;
+              // Check if contact has any info
+              const hasEmail = result.contact.emails && result.contact.emails.length > 0;
+              const hasPhone = result.contact.phones && result.contact.phones.length > 0;
+              if (hasEmail || hasPhone) {
+                successCount++;
+              } else {
+                noContactCount++;
+              }
             } else {
               failedCount++;
+              // Check if it's a specific error type
+              if (result.error?.includes('Service temporarily unavailable')) {
+                errorCount++;
+              }
             }
           } catch (err) {
             console.error('Extraction error:', err);
             failedCount++;
+            errorCount++;
           } finally {
             processedCount += 1;
             setBulkProgress({ current: processedCount, total: validUrls.length });
@@ -411,10 +434,19 @@ const ContactExtractorSubscription: React.FC = () => {
         });
       }
       
-      let message = interpolate(t.feedback.bulkSuccess, { success: successCount });
-      if (failedCount > 0) {
-        message += ` ${interpolate(t.feedback.bulkPartialFail, { failed: failedCount })}`;
-      }
+      // Create detailed success message
+      const totalProcessed = lines.length;
+      const message = `Extraction Complete!\n\n` +
+        `📊 Summary:\n` +
+        `• Total URLs submitted: ${totalProcessed}\n` +
+        `• Valid LinkedIn URLs: ${validUrls.length}\n` +
+        `• Invalid URLs: ${invalidLines.length}\n\n` +
+        `✅ Results:\n` +
+        `• Successful extractions: ${successCount} (found contact info)\n` +
+        `• Profiles without contact info: ${noContactCount}\n` +
+        `• Failed extractions: ${failedCount}\n` +
+        (errorCount > 0 ? `• Service errors: ${errorCount}\n` : '') +
+        `\n💰 Credits used: ${successCount * 2} (approx.)`;
       
       showFeedback('success', message);
 
