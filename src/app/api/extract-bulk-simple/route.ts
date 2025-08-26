@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
-    const { urls, userId } = await request.json();
+    const { urls, userId, sessionId } = await request.json();
     
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
@@ -26,6 +26,15 @@ export async function POST(request: NextRequest) {
     const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
     
     console.log(`Server: Starting bulk extraction with ${availableKeys} API keys for ${urls.length} URLs`);
+    
+    // Update session if provided
+    if (sessionId && supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      await supabase
+        .from('extraction_sessions')
+        .update({ status: 'in_progress', processed_urls: 0 })
+        .eq('id', sessionId);
+    }
     
     // Process extraction with all available API keys
     const results = await extractContactsInParallel(urls, {
@@ -49,9 +58,12 @@ export async function POST(request: NextRequest) {
     }
     
     // Process results and save to database
-    for (const result of results) {
+    let processedIndices: number[] = [];
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
       if (result.success && result.contact) {
         successCount++;
+        processedIndices.push(i);
         // Our pricing: 1 credit per email, 2 credits per phone
         const emailCount = result.contact.emails?.length || 0;
         const phoneCount = result.contact.phones?.length || 0;
@@ -102,6 +114,27 @@ export async function POST(request: NextRequest) {
         console.error('Credit deduction error:', creditError);
         // Continue without deducting credits
       }
+    }
+    
+    // Update session with final stats if provided
+    if (sessionId && supabaseUrl && supabaseKey && !supabase) {
+      supabase = createClient(supabaseUrl, supabaseKey);
+    }
+    
+    if (sessionId && supabase) {
+      await supabase
+        .from('extraction_sessions')
+        .update({
+          processed_urls: results.length,
+          successful_extractions: successCount,
+          failed_extractions: results.length - successCount,
+          credits_used: creditsUsed,
+          processed_url_indices: processedIndices,
+          results: results,
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', sessionId);
     }
     
     // Log final API key usage

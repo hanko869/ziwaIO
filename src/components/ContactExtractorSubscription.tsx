@@ -10,6 +10,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import DepositCredits from './DepositCredits';
 import PaymentDetailsModal from './PaymentDetailsModal';
 import { initializeApiKeys } from '@/utils/apiKeyLoader';
+import { useExtractionSession } from '@/hooks/useExtractionSession';
+import ExtractionWarningDialog from './ExtractionWarningDialog';
+import ResumableExtractionBanner from './ResumableExtractionBanner';
 
 const ContactExtractorSubscription: React.FC = () => {
   const { t } = useLanguage();
@@ -24,6 +27,19 @@ const ContactExtractorSubscription: React.FC = () => {
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
+  const [showNavigationWarning, setShowNavigationWarning] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
+  // Use extraction session hook
+  const {
+    currentSession,
+    isRecovering,
+    createSession,
+    updateSession,
+    completeSession,
+    cancelSession,
+    getActiveSessions
+  } = useExtractionSession();
 
   // Configuration constants
   const MAX_BULK_URLS = 500; // Increased from 100, max API limit is 2500
@@ -109,6 +125,20 @@ const ContactExtractorSubscription: React.FC = () => {
     }
   }, [user]);
 
+  // Set up navigation warning when extraction is in progress
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isExtracting || currentSession?.status === 'in_progress') {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isExtracting, currentSession]);
+
   const checkPaymentStatus = async (paymentId: string) => {
     try {
       showFeedback('info', 'Verifying payment...');
@@ -188,6 +218,9 @@ const ContactExtractorSubscription: React.FC = () => {
     setIsExtracting(true);
     showFeedback('info', t.feedback.extracting);
 
+    // Create extraction session
+    const session = await createSession('single', [linkedinUrl]);
+
     try {
       const result = await extractContactFromLinkedIn(linkedinUrl, user?.id);
       
@@ -224,9 +257,26 @@ const ContactExtractorSubscription: React.FC = () => {
       } else {
         showFeedback('error', result.error || t.feedback.failedExtract);
       }
+      
+      // Complete session
+      if (session) {
+        await completeSession(session.id, {
+          processed_urls: 1,
+          successful_extractions: result.success ? 1 : 0,
+          failed_extractions: result.success ? 0 : 1
+        });
+      }
     } catch (error) {
       console.error('Contact extraction error:', error);
       showFeedback('error', t.feedback.unexpectedError);
+      
+      // Mark session as failed
+      if (session) {
+        await updateSession(session.id, {
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     } finally {
       setIsExtracting(false);
     }
@@ -296,6 +346,9 @@ const ContactExtractorSubscription: React.FC = () => {
 
       setIsExtracting(true);
       
+      // Create extraction session
+      const session = await createSession('bulk', validUrls);
+      
       // Use client-managed concurrency and update real progress per completed URL
       const concurrency = 6;
       let successCount = 0;
@@ -323,6 +376,15 @@ const ContactExtractorSubscription: React.FC = () => {
           } finally {
             processedCount += 1;
             setBulkProgress({ current: processedCount, total: validUrls.length });
+            
+            // Update session progress
+            if (session && processedCount % 5 === 0) { // Update every 5 URLs
+              await updateSession(session.id, {
+                processed_urls: processedCount,
+                successful_extractions: successCount,
+                failed_extractions: failedCount
+              });
+            }
           }
         }
       };
@@ -340,6 +402,15 @@ const ContactExtractorSubscription: React.FC = () => {
       // Refresh credit balance
       await fetchCreditBalance();
       
+      // Complete session
+      if (session) {
+        await completeSession(session.id, {
+          processed_urls: validUrls.length,
+          successful_extractions: successCount,
+          failed_extractions: failedCount
+        });
+      }
+      
       let message = interpolate(t.feedback.bulkSuccess, { success: successCount });
       if (failedCount > 0) {
         message += ` ${interpolate(t.feedback.bulkPartialFail, { failed: failedCount })}`;
@@ -350,6 +421,14 @@ const ContactExtractorSubscription: React.FC = () => {
     } catch (error) {
       console.error('File upload error:', error);
       showFeedback('error', t.feedback.fileReadError);
+      
+      // Mark session as failed
+      if (session) {
+        await updateSession(session.id, {
+          status: 'failed',
+          error_message: error instanceof Error ? error.message : 'File processing error'
+        });
+      }
     } finally {
       setIsExtracting(false);
       setBulkProgress(null);
@@ -428,6 +507,30 @@ const ContactExtractorSubscription: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {/* Resumable Session Banner */}
+        {!isRecovering && currentSession && currentSession.status === 'in_progress' && (
+          <ResumableExtractionBanner
+            session={currentSession}
+            onResume={async () => {
+              // Resume extraction with remaining URLs
+              const remainingUrls = currentSession.urls.filter(
+                (_, index) => !currentSession.processed_url_indices.includes(index)
+              );
+              setIsExtracting(true);
+              setBulkProgress({ 
+                current: currentSession.processed_urls, 
+                total: currentSession.total_urls 
+              });
+              // Continue processing remaining URLs
+              // TODO: Implement resume logic
+              showFeedback('info', 'Resuming extraction...');
+            }}
+            onDismiss={() => {
+              cancelSession(currentSession.id);
+            }}
+          />
+        )}
+        
         {/* Feedback Message */}
         {feedback && (
           <div className={`mb-6 p-4 rounded-2xl shadow-sm whitespace-pre-line transform transition-all duration-300 ${
@@ -1004,6 +1107,22 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
           </div>
         </div>
       </div>
+      
+      {/* Navigation Warning Dialog */}
+      <ExtractionWarningDialog
+        isOpen={showNavigationWarning}
+        onConfirm={() => {
+          if (pendingNavigation) {
+            pendingNavigation();
+          }
+          setShowNavigationWarning(false);
+        }}
+        onCancel={() => {
+          setShowNavigationWarning(false);
+          setPendingNavigation(null);
+        }}
+        progress={bulkProgress}
+      />
     </div>
   );
 }

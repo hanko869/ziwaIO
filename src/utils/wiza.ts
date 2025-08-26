@@ -458,6 +458,14 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
           console.log('=== INDIVIDUAL REVEAL COMPLETE OBJECT ===');
           console.log(JSON.stringify(status.data, null, 2));
           console.log('=== END INDIVIDUAL REVEAL OBJECT ===');
+          
+          // Check for billing issues
+          if (status.data.fail_error === 'billing_issue') {
+            return {
+              success: false,
+              error: 'Wiza API billing issue: Your Wiza account has a billing problem. Please check your Wiza account billing status at https://wiza.co/dashboard/billing or contact hello@wiza.co for assistance.'
+            };
+          }
 
           // We are phone-only: do not collect emails to avoid email credit usage
           const allEmails: string[] = [];
@@ -776,6 +784,14 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiK
           console.log('=== INDIVIDUAL REVEAL COMPLETE OBJECT ===');
           console.log(JSON.stringify(status.data, null, 2));
           console.log('=== END INDIVIDUAL REVEAL OBJECT ===');
+          
+          // Check for billing issues
+          if (status.data.fail_error === 'billing_issue') {
+            return {
+              success: false,
+              error: 'Wiza API billing issue: Your Wiza account has a billing problem. Please check your Wiza account billing status at https://wiza.co/dashboard/billing or contact hello@wiza.co for assistance.'
+            };
+          }
 
           // Phone-only: skip collecting emails
           const allEmails: string[] = [];
