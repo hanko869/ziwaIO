@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
     let result: any = null;
     let lastError: string = '';
     let attemptCount = 0;
+    let successfulApiKey: string | null = null;
     const maxAttempts = apiKeyPool?.getAllKeysStatus().length || 3;
     
     while (attemptCount < maxAttempts) {
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       // If successful, break the loop
       if (result.success) {
         console.log(`Success with API key ${apiKey.substring(0, 10)}...`);
+        successfulApiKey = apiKey;
         break;
       }
       
@@ -166,7 +168,7 @@ export async function POST(request: NextRequest) {
       success: result.success,
       contact: result.contact,
       error: result.error,
-      apiKeyUsed: apiKey.substring(0, 10) + '...'
+      apiKeyUsed: successfulApiKey ? successfulApiKey.substring(0, 10) + '...' : 'N/A'
     });
     
   } catch (error) {
