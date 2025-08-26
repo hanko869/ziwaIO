@@ -35,18 +35,6 @@ export async function POST(request: NextRequest) {
       allKeys: apiKeyPool?.getAllKeysStatus() || []
     });
     
-    const apiKey = apiKeyPool?.getNextKey();
-    
-    if (!apiKey) {
-      console.error('No API key available. Pool status:', apiKeyPool?.getAllKeysStatus());
-      return NextResponse.json(
-        { error: 'No API keys available' },
-        { status: 503 }
-      );
-    }
-    
-    console.log(`Server: Extracting ${url} with API key ${apiKey.substring(0, 10)}...`);
-    
     // Check user credits if userId provided
     if (userId) {
       try {
@@ -63,13 +51,55 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Extract contact using the selected API key
-    const result = await extractContactWithWiza(url, apiKey);
+    // Try extraction with available API keys until one succeeds
+    let result: any = null;
+    let lastError: string = '';
+    let attemptCount = 0;
+    const maxAttempts = apiKeyPool?.getAllKeysStatus().length || 3;
     
-    // Mark API key as unavailable if there's a billing/credits issue
-    if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('API credits issue'))) {
-      apiKeyPool?.markKeyUnavailable(apiKey);
-      console.log(`Marked API key ${apiKey.substring(0, 10)}... as unavailable due to: ${result.error}`);
+    while (attemptCount < maxAttempts) {
+      const apiKey = apiKeyPool?.getNextKey();
+      
+      if (!apiKey) {
+        console.error('No more API keys available. Pool status:', apiKeyPool?.getAllKeysStatus());
+        break;
+      }
+      
+      console.log(`Server: Attempt ${attemptCount + 1}/${maxAttempts} - Extracting ${url} with API key ${apiKey.substring(0, 10)}...`);
+      
+      // Extract contact using the selected API key
+      result = await extractContactWithWiza(url, apiKey);
+      
+      // If successful, break the loop
+      if (result.success) {
+        console.log(`Success with API key ${apiKey.substring(0, 10)}...`);
+        break;
+      }
+      
+      // If failed due to billing/credits, mark as unavailable and try next
+      if (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('Service temporarily unavailable')) {
+        apiKeyPool?.markKeyUnavailable(apiKey);
+        console.log(`API key ${apiKey.substring(0, 10)}... has billing/credit issues. Marked as unavailable.`);
+        lastError = result.error;
+        attemptCount++;
+        continue;
+      }
+      
+      // For other errors, just return the error
+      console.log(`API key ${apiKey.substring(0, 10)}... failed with non-billing error: ${result.error}`);
+      break;
+    }
+    
+    // If no result or all attempts failed
+    if (!result || !result.success) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: lastError || 'Service temporarily unavailable. Please try again later or contact support.',
+          attemptsMade: attemptCount
+        },
+        { status: 503 }
+      );
     }
     
     // Save to database and deduct credits if successful and userId provided

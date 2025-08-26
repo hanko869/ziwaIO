@@ -463,7 +463,7 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
           if (status.data.fail_error === 'billing_issue') {
             return {
               success: false,
-              error: 'Service temporarily unavailable. Please try again later or contact support. (Error: API credits issue)'
+              error: 'Service temporarily unavailable. Please try again later or contact support.'
             };
           }
 
@@ -789,7 +789,7 @@ export const extractContactWithWizaIndividual = async (linkedinUrl: string, apiK
           if (status.data.fail_error === 'billing_issue') {
             return {
               success: false,
-              error: 'Service temporarily unavailable. Please try again later or contact support. (Error: API credits issue)'
+              error: 'Service temporarily unavailable. Please try again later or contact support.'
             };
           }
 

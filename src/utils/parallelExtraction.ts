@@ -113,7 +113,26 @@ export class ParallelExtractionQueue {
 
     try {
       // Use the specific API key for this task
-      const result = await extractContactWithWiza(task.url, task.apiKey);
+      let result = await extractContactWithWiza(task.url, task.apiKey);
+      
+      // If failed due to billing/credits, try with another API key
+      if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('Service temporarily unavailable'))) {
+        const apiKeyPool = getApiKeyPool();
+        apiKeyPool?.markKeyUnavailable(task.apiKey);
+        console.log(`API key ${task.apiKey.substring(0, 10)}... has billing issues. Trying with another key...`);
+        
+        // Try to get another API key
+        const newApiKey = apiKeyPool?.getNextKey();
+        if (newApiKey && newApiKey !== task.apiKey) {
+          console.log(`Retrying ${task.url} with API key ${newApiKey.substring(0, 10)}...`);
+          result = await extractContactWithWiza(task.url, newApiKey);
+          
+          // If this also fails with billing, mark it too
+          if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('Service temporarily unavailable'))) {
+            apiKeyPool?.markKeyUnavailable(newApiKey);
+          }
+        }
+      }
       
       this.results.set(task.url, result);
       this.completed++;
@@ -128,13 +147,6 @@ export class ParallelExtractionQueue {
       // Report task completion
       if (this.options.onTaskComplete) {
         this.options.onTaskComplete(task.url, result, task.index);
-      }
-
-      // Update API key credits if extraction failed due to credits or billing
-      if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('API credits issue'))) {
-        const apiKeyPool = getApiKeyPool();
-        apiKeyPool?.markKeyUnavailable(task.apiKey);
-        console.log(`Marked API key ${task.apiKey.substring(0, 10)}... as unavailable due to: ${result.error}`);
       }
 
     } catch (error) {
