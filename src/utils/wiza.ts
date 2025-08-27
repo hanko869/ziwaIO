@@ -430,8 +430,9 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
     // Wait for completion
     const revealId = revealResponse.data.id.toString();
     const maxWaitTime = 180000; // 3 minutes
-    const pollInterval = 2000; // 2 seconds for faster completion detection
     const startTime = Date.now();
+    let pollInterval = 500; // Start with 500ms for faster initial detection
+    let pollCount = 0;
 
     while (Date.now() - startTime < maxWaitTime) {
       try {
@@ -549,6 +550,12 @@ export const extractContactWithWiza = async (linkedinUrl: string, apiKeyOverride
 
         // Wait before next poll
         await new Promise(resolve => setTimeout(resolve, pollInterval));
+        
+        // Increase poll interval after initial fast polls
+        pollCount++;
+        if (pollCount === 10 && pollInterval === 500) {
+          pollInterval = 2000; // After 5 seconds, switch to 2-second polls
+        }
       } catch (error) {
         console.log('Individual Reveal status check error:', error);
         await new Promise(resolve => setTimeout(resolve, pollInterval));

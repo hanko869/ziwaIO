@@ -21,6 +21,8 @@ export class ParallelExtractionQueue {
   private completed: number = 0;
   private results: Map<string, ExtractionResult> = new Map();
   private options: ExtractionQueueOptions;
+  private taskQueue: ExtractionTask[] = [];
+  private activePromises: Set<Promise<void>> = new Set();
 
   constructor(options: ExtractionQueueOptions) {
     this.options = {
@@ -50,10 +52,9 @@ export class ParallelExtractionQueue {
     });
   }
 
-  // Process all tasks with parallel execution
+  // Process all tasks with continuous queue execution
   async processAll(): Promise<Map<string, ExtractionResult>> {
-    const batches = this.createBatches();
-    console.log(`Processing ${this.tasks.length} URLs in ${batches.length} batches with max ${this.options.maxConcurrent} concurrent`);
+    console.log(`🚀 Processing ${this.tasks.length} URLs with continuous queue (max ${this.options.maxConcurrent} concurrent)`);
     
     // Log API key distribution
     const keyDistribution = new Map<string, number>();
@@ -63,22 +64,43 @@ export class ParallelExtractionQueue {
     });
     console.log('API Key Distribution:', Array.from(keyDistribution.entries()));
     
-    for (const batch of batches) {
-      console.log(`Starting batch with ${batch.length} URLs`);
-      // Log which API keys are in this batch
-      const batchKeys = batch.map(t => t.apiKey.substring(0, 10) + '...').join(', ');
-      console.log(`Batch API keys: ${batchKeys}`);
-      
-      await this.processBatch(batch);
-      
-      // Delay between batches to avoid rate limiting
-      if (this.options.delayBetweenBatches && batch !== batches[batches.length - 1]) {
-        console.log(`Waiting ${this.options.delayBetweenBatches}ms before next batch...`);
-        await new Promise(resolve => setTimeout(resolve, this.options.delayBetweenBatches));
-      }
+    // Initialize task queue
+    this.taskQueue = [...this.tasks];
+    const startTime = Date.now();
+    
+    // Start initial concurrent tasks
+    while (this.running < this.options.maxConcurrent && this.taskQueue.length > 0) {
+      this.startNextTask();
     }
+    
+    // Wait for all tasks to complete
+    while (this.activePromises.size > 0) {
+      await Promise.race(this.activePromises);
+    }
+    
+    const totalTime = Date.now() - startTime;
+    console.log(`✅ Completed all ${this.tasks.length} URLs in ${totalTime}ms (${(totalTime / 1000).toFixed(2)}s)`);
+    console.log(`📊 Average time per URL: ${(totalTime / this.tasks.length).toFixed(0)}ms`);
+    console.log(`📈 Processing rate: ${(this.tasks.length / (totalTime / 1000)).toFixed(2)} URLs/second`);
 
     return this.results;
+  }
+  
+  // Start the next task from the queue
+  private startNextTask() {
+    if (this.taskQueue.length === 0 || this.running >= this.options.maxConcurrent) {
+      return;
+    }
+    
+    const task = this.taskQueue.shift()!;
+    const promise = this.processTaskContinuous(task);
+    this.activePromises.add(promise);
+    
+    promise.finally(() => {
+      this.activePromises.delete(promise);
+      // Start next task when one completes
+      this.startNextTask();
+    });
   }
 
   // Create batches based on max concurrent limit
@@ -105,11 +127,10 @@ export class ParallelExtractionQueue {
     console.log(`Batch completed in ${duration}ms (${(duration / 1000).toFixed(2)}s)`);
   }
 
-  // Process individual task
-  private async processTask(task: ExtractionTask): Promise<void> {
+  // Process individual task for continuous queue
+  private async processTaskContinuous(task: ExtractionTask): Promise<void> {
     this.running++;
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] START: Processing ${task.url} with API key ${task.apiKey.substring(0, 10)}...`);
+    const startTime = Date.now();
 
     try {
       // Use the specific API key for this task
@@ -119,12 +140,10 @@ export class ParallelExtractionQueue {
       if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('Service temporarily unavailable'))) {
         const apiKeyPool = getApiKeyPool();
         apiKeyPool?.markKeyUnavailable(task.apiKey);
-        console.log(`API key ${task.apiKey.substring(0, 10)}... has billing issues. Trying with another key...`);
         
         // Try to get another API key
         const newApiKey = apiKeyPool?.getNextKey();
         if (newApiKey && newApiKey !== task.apiKey) {
-          console.log(`Retrying ${task.url} with API key ${newApiKey.substring(0, 10)}...`);
           result = await extractContactWithWiza(task.url, newApiKey);
           
           // If this also fails with billing, mark it too
@@ -136,8 +155,11 @@ export class ParallelExtractionQueue {
       
       this.results.set(task.url, result);
       this.completed++;
-      const endTimestamp = new Date().toISOString();
-      console.log(`[${endTimestamp}] END: Completed ${task.url}: ${result.success ? 'success' : 'failed'}`);
+      
+      const duration = Date.now() - startTime;
+      if (this.completed % 10 === 0) { // Log every 10 completions
+        console.log(`📊 Progress: ${this.completed}/${this.tasks.length} (${((this.completed / this.tasks.length) * 100).toFixed(1)}%) - Last 10 avg: ${duration}ms`);
+      }
 
       // Report progress
       if (this.options.onProgress) {
@@ -183,14 +205,19 @@ export async function extractContactsInParallel(
 ): Promise<ExtractionResult[]> {
   const apiKeyPool = getApiKeyPool();
   const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
-  console.log(`Starting parallel extraction with ${availableKeys} available API keys`);
+  console.log(`🔑 Starting parallel extraction with ${availableKeys} available API keys`);
   
   // Log current API key usage stats
   const keyStats = apiKeyPool?.getAllKeysStatus();
   console.log('API Key Usage Before Extraction:', keyStats);
   
+  // Optimize concurrency based on number of API keys
+  // With 10 keys, we can safely run 10x concurrent requests per key
+  const optimalConcurrency = Math.min(availableKeys * 10, 100); // Cap at 100 for system stability
+  console.log(`⚡ Using ${optimalConcurrency} concurrent requests for optimal speed`);
+  
   const queue = new ParallelExtractionQueue({
-    maxConcurrent: availableKeys * 3, // Increased to 3x for better throughput
+    maxConcurrent: optimalConcurrency,
     ...options
   });
 
