@@ -20,6 +20,13 @@ export async function POST(request: NextRequest) {
     console.log('WIZA_API_KEY exists:', !!process.env.WIZA_API_KEY);
     console.log('WIZA_API_KEY_2 exists:', !!process.env.WIZA_API_KEY_2);
     console.log('WIZA_API_KEY_3 exists:', !!process.env.WIZA_API_KEY_3);
+    console.log('WIZA_API_KEY_4 exists:', !!process.env.WIZA_API_KEY_4);
+    console.log('WIZA_API_KEY_5 exists:', !!process.env.WIZA_API_KEY_5);
+    console.log('WIZA_API_KEY_6 exists:', !!process.env.WIZA_API_KEY_6);
+    console.log('WIZA_API_KEY_7 exists:', !!process.env.WIZA_API_KEY_7);
+    console.log('WIZA_API_KEY_8 exists:', !!process.env.WIZA_API_KEY_8);
+    console.log('WIZA_API_KEY_9 exists:', !!process.env.WIZA_API_KEY_9);
+    console.log('WIZA_API_KEY_10 exists:', !!process.env.WIZA_API_KEY_10);
     
     initializeApiKeys();
     const apiKeyPool = getApiKeyPool();
@@ -37,10 +44,25 @@ export async function POST(request: NextRequest) {
     }
     
     // Process extraction with optimized concurrency
+    // Log extraction start details
+    console.log(`Server: Starting bulk extraction`);
+    console.log(`Server: Processing ${urls.length} URLs with ${availableKeys} API keys`);
+    console.log(`Server: Environment - NODE_ENV: ${process.env.NODE_ENV || 'development'}, VERCEL_ENV: ${process.env.VERCEL_ENV || 'not-vercel'}`);
+    
+    const extractionStartTime = Date.now();
     const results = await extractContactsInParallel(urls, {
       // No need to specify maxConcurrent - extractContactsInParallel now optimizes it automatically
-      delayBetweenBatches: 0 // No delay for maximum speed
+      delayBetweenBatches: 0, // No delay for maximum speed
+      onProgress: (completed, total) => {
+        const elapsed = Date.now() - extractionStartTime;
+        const rate = completed / (elapsed / 1000);
+        console.log(`Server: Progress ${completed}/${total} (${rate.toFixed(1)} URLs/sec, ${(elapsed/1000).toFixed(1)}s elapsed)`);
+      }
     });
+    
+    const extractionTime = Date.now() - extractionStartTime;
+    console.log(`Server: Bulk extraction completed in ${extractionTime}ms (${(extractionTime / 1000).toFixed(1)}s)`);
+    console.log(`Server: Average time per URL: ${(extractionTime / urls.length).toFixed(0)}ms`);
     
     // Count successful extractions and calculate credits
     let successCount = 0;
@@ -59,6 +81,10 @@ export async function POST(request: NextRequest) {
     
     // Process results and save to database
     let processedIndices: number[] = [];
+    let serviceErrors = 0;
+    let noContactErrors = 0;
+    let otherErrors = 0;
+    
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success && result.contact) {
@@ -100,8 +126,19 @@ export async function POST(request: NextRequest) {
             console.error('Database save error:', dbError);
           }
         }
+      } else {
+        // Count error types
+        if (result.error?.includes('Service temporarily unavailable')) {
+          serviceErrors++;
+        } else if (result.error?.includes('no contact information')) {
+          noContactErrors++;
+        } else {
+          otherErrors++;
+        }
       }
     }
+    
+    console.log(`Extraction Summary: ${successCount} successful, ${serviceErrors} service errors, ${noContactErrors} no contact info, ${otherErrors} other errors`);
     
     // Deduct credits if userId provided
     if (userId && creditsUsed > 0) {

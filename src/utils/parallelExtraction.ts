@@ -141,15 +141,25 @@ export class ParallelExtractionQueue {
         const apiKeyPool = getApiKeyPool();
         apiKeyPool?.markKeyUnavailable(task.apiKey);
         
-        // Try to get another API key
-        const newApiKey = apiKeyPool?.getNextKey();
-        if (newApiKey && newApiKey !== task.apiKey) {
+        // Try multiple times with different API keys
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries && !result.success) {
+          const newApiKey = apiKeyPool?.getNextKey();
+          if (!newApiKey || newApiKey === task.apiKey) {
+            break; // No more keys available
+          }
+          
+          console.log(`Retry ${retryCount + 1} with different API key for ${task.url}`);
           result = await extractContactWithWiza(task.url, newApiKey);
           
           // If this also fails with billing, mark it too
           if (!result.success && (result.error?.includes('credits') || result.error?.includes('billing') || result.error?.includes('Service temporarily unavailable'))) {
             apiKeyPool?.markKeyUnavailable(newApiKey);
           }
+          
+          retryCount++;
         }
       }
       
@@ -204,6 +214,11 @@ export async function extractContactsInParallel(
   options?: Partial<ExtractionQueueOptions>
 ): Promise<ExtractionResult[]> {
   const apiKeyPool = getApiKeyPool();
+  
+  // Reset all keys availability at the start of each batch extraction
+  // This ensures keys that were temporarily marked unavailable get another chance
+  apiKeyPool?.resetAllKeysAvailability();
+  
   const availableKeys = apiKeyPool?.getAvailableKeysCount() || 1;
   console.log(`🔑 Starting parallel extraction with ${availableKeys} available API keys`);
   
@@ -211,10 +226,21 @@ export async function extractContactsInParallel(
   const keyStats = apiKeyPool?.getAllKeysStatus();
   console.log('API Key Usage Before Extraction:', keyStats);
   
-  // Optimize concurrency based on number of API keys
-  // With 10 keys, we can safely run 10x concurrent requests per key
-  const optimalConcurrency = Math.min(availableKeys * 10, 100); // Cap at 100 for system stability
-  console.log(`⚡ Using ${optimalConcurrency} concurrent requests for optimal speed`);
+  // Optimize concurrency based on number of API keys and environment
+  // Production environments may have different limits than local
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  const baseMultiplier = isProduction ? 5 : 10; // More conservative in production
+  const maxConcurrent = isProduction ? 50 : 100; // Lower cap for production stability
+  
+  const optimalConcurrency = Math.min(availableKeys * baseMultiplier, maxConcurrent);
+  console.log(`⚡ Parallel Extraction Configuration:`);
+  console.log(`  - Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
+  console.log(`  - NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+  console.log(`  - VERCEL_ENV: ${process.env.VERCEL_ENV || 'not set'}`);
+  console.log(`  - Available API Keys: ${availableKeys}`);
+  console.log(`  - Base Multiplier: ${baseMultiplier}x per key`);
+  console.log(`  - Max Concurrent Limit: ${maxConcurrent}`);
+  console.log(`  - Calculated Concurrency: ${optimalConcurrency} parallel requests`);
   
   const queue = new ParallelExtractionQueue({
     maxConcurrent: optimalConcurrency,
