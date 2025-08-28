@@ -69,14 +69,19 @@ export default function UserManagement() {
   const toggleUserStatus = async (userId: string) => {
     try {
       const response = await fetch(`/api/admin/users/${userId}/toggle`, {
-        method: 'PUT'
+        method: 'POST'
       });
       
       if (response.ok) {
         fetchUsers();
+      } else {
+        const errorData = await response.json();
+        console.error('Toggle user error:', errorData);
+        alert(errorData.error || 'Failed to toggle user status');
       }
     } catch (error) {
       console.error('Failed to toggle user status:', error);
+      alert('Failed to toggle user status');
     }
   };
 
@@ -90,9 +95,15 @@ export default function UserManagement() {
       
       if (response.ok) {
         fetchUsers();
+        alert('User deleted successfully');
+      } else {
+        const errorData = await response.json();
+        console.error('Delete user error:', errorData);
+        alert(errorData.error || 'Failed to delete user');
       }
     } catch (error) {
       console.error('Failed to delete user:', error);
+      alert('Failed to delete user');
     }
   };
 
