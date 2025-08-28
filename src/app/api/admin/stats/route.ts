@@ -12,15 +12,12 @@ export async function GET(request: NextRequest) {
 
     // Get statistics
     const stats = await getOverallStatistics();
-    
-    // Calculate revenue (assuming 1 USDT = 30 credits, and 1 credit = $0.033)
-    const totalRevenue = Math.round(stats.totalExtractions * 0.033 * 100) / 100;
 
     return NextResponse.json({
       totalUsers: stats.totalUsers,
       activeUsers: stats.activeUsers,
       totalExtractions: stats.totalExtractions,
-      totalRevenue,
+      totalRevenue: stats.totalRevenue || 0, // Use actual revenue from credit_transactions
       todayActivity: stats.todayActivityCount,
       successRate: stats.successRate,
       recentActivities: stats.recentActivities

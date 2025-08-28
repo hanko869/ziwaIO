@@ -190,15 +190,48 @@ export const getOverallStatistics = async () => {
     getAllActivities()
   ]);
   
+  // Get extraction count from extracted_contacts table
+  const { count: totalExtractions, error: extractionError } = await supabase
+    .from('extracted_contacts')
+    .select('*', { count: 'exact', head: true });
+    
+  if (extractionError) {
+    console.error('Error fetching extraction count:', extractionError);
+  }
+  
+  // Get today's extractions
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const { count: todayExtractions, error: todayError } = await supabase
+    .from('extracted_contacts')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', today.toISOString())
+    .lt('created_at', tomorrow.toISOString());
+    
+  if (todayError) {
+    console.error('Error fetching today extraction count:', todayError);
+  }
+  
+  // Calculate revenue from credit_transactions
+  const { data: transactions, error: transactionError } = await supabase
+    .from('credit_transactions')
+    .select('amount')
+    .eq('transaction_type', 'payment_success');
+    
+  let totalRevenue = 0;
+  if (!transactionError && transactions) {
+    totalRevenue = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+  }
+  
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.is_active).length;
-  const totalExtractions = activities.filter(a => a.action === 'extract_contact').length;
-  const successfulExtractions = activities.filter(a => a.action === 'extract_contact' && a.success).length;
   
-  const today = new Date().toDateString();
   const todayActivities = activities.filter(a => {
     const activityDate = new Date(a.timestamp).toDateString();
-    return activityDate === today;
+    return activityDate === today.toDateString();
   });
   
   const recentActivities = await getRecentActivities(10);
@@ -206,10 +239,11 @@ export const getOverallStatistics = async () => {
   return {
     totalUsers,
     activeUsers,
-    totalExtractions,
-    successfulExtractions,
-    successRate: totalExtractions > 0 ? (successfulExtractions / totalExtractions * 100).toFixed(1) : '0',
-    todayActivityCount: todayActivities.length,
+    totalExtractions: totalExtractions || 0,
+    successfulExtractions: totalExtractions || 0, // All saved extractions are successful
+    successRate: '100', // All saved extractions are successful
+    todayActivityCount: todayExtractions || 0,
+    totalRevenue,
     recentActivities
   };
 };
