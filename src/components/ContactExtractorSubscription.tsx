@@ -503,6 +503,10 @@ const ContactExtractorSubscription: React.FC = () => {
         });
       }
       
+      // Clear progress bar before showing results
+      setIsExtracting(false);
+      setBulkProgress(null);
+      
       // Create detailed success message
       const totalProcessed = lines.length;
       const message = `Extraction Complete!\n\n` +
