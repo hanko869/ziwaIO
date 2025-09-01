@@ -445,7 +445,16 @@ const ContactExtractorSubscription: React.FC = () => {
         if (pollInterval) clearInterval(pollInterval);
 
         if (!response.ok) {
-          const error = await response.json();
+          console.error('Bulk extraction failed:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          
+          let error;
+          try {
+            error = JSON.parse(errorText);
+          } catch (e) {
+            error = { error: errorText || 'Bulk extraction failed' };
+          }
           throw new Error(error.error || 'Bulk extraction failed');
         }
 

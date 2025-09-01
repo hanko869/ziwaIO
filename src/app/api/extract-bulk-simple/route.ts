@@ -4,6 +4,16 @@ import { initializeApiKeys } from '@/utils/apiKeyLoader';
 import { getApiKeyPool } from '@/utils/apiKeyPool';
 import { createClient } from '@supabase/supabase-js';
 
+// Shared progress store
+export const progressStore = new Map<string, {
+  total: number;
+  processed: number;
+  successful: number;
+  failed: number;
+  lastUpdate: number;
+  status: 'in_progress' | 'completed' | 'failed';
+}>();
+
 export async function POST(request: NextRequest) {
   try {
     const { urls, userId, sessionId, progressId } = await request.json();
@@ -62,17 +72,15 @@ export async function POST(request: NextRequest) {
     
     // Initialize progress tracking
     if (progressId) {
-      await fetch(new URL('/api/extract-bulk-simple/progress', request.url).toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: progressId,
-          total: urls.length,
-          processed: 0,
-          successful: 0,
-          failed: 0
-        })
+      progressStore.set(progressId, {
+        total: urls.length,
+        processed: 0,
+        successful: 0,
+        failed: 0,
+        lastUpdate: Date.now(),
+        status: 'in_progress'
       });
+      console.log('Initialized progress tracking for:', progressId);
     }
     
     const results = await extractContactsInParallel(urls, {
@@ -90,17 +98,15 @@ export async function POST(request: NextRequest) {
           
           // Update progress tracking
           if (progressId) {
-            await fetch(new URL('/api/extract-bulk-simple/progress', request.url).toString(), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: progressId,
-                total: urls.length,
+            const currentProgress = progressStore.get(progressId);
+            if (currentProgress) {
+              progressStore.set(progressId, {
+                ...currentProgress,
                 processed: completed,
-                successful: 0, // Will be updated later
-                failed: 0 // Will be updated later
-              })
-            });
+                lastUpdate: Date.now()
+              });
+              console.log(`Progress update: ${progressId} - ${completed}/${total}`);
+            }
           }
           
           // Update session progress if available
@@ -191,6 +197,21 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`Extraction Summary: ${successCount} successful, ${serviceErrors} service errors, ${noContactErrors} no contact info, ${otherErrors} other errors`);
+    
+    // Update final progress
+    if (progressId) {
+      const currentProgress = progressStore.get(progressId);
+      if (currentProgress) {
+        progressStore.set(progressId, {
+          ...currentProgress,
+          processed: results.length,
+          successful: successCount,
+          failed: results.length - successCount,
+          lastUpdate: Date.now(),
+          status: 'completed'
+        });
+      }
+    }
     
     // Deduct credits if userId provided
     if (userId && creditsUsed > 0) {
