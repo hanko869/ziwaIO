@@ -185,21 +185,30 @@ export const getUserStatistics = async (userId: string) => {
 };
 
 export const getOverallStatistics = async () => {
-  const [users, activities] = await Promise.all([
-    getAllUsers(),
-    getAllActivities()
-  ]);
+  let users = [];
+  let activities = [];
   
-  // Get extraction count from extracted_contacts table
+  try {
+    [users, activities] = await Promise.all([
+      getAllUsers(),
+      getAllActivities()
+    ]);
+  } catch (error) {
+    console.error('Error fetching users/activities:', error);
+    // Continue with empty arrays if there's an error
+  }
+  
+  // Get total extractions by counting rows in extracted_contacts
   const { count: totalExtractions, error: extractionError } = await supabase
     .from('extracted_contacts')
     .select('*', { count: 'exact', head: true });
     
+  console.log('Total extractions from extracted_contacts:', totalExtractions);
   if (extractionError) {
     console.error('Error fetching extraction count:', extractionError);
   }
   
-  // Get today's extractions
+  // Get today's extractions directly from extracted_contacts
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
@@ -208,22 +217,25 @@ export const getOverallStatistics = async () => {
   const { count: todayExtractions, error: todayError } = await supabase
     .from('extracted_contacts')
     .select('*', { count: 'exact', head: true })
-    .gte('created_at', today.toISOString())
-    .lt('created_at', tomorrow.toISOString());
+    .gte('extracted_at', today.toISOString())
+    .lt('extracted_at', tomorrow.toISOString());
     
   if (todayError) {
     console.error('Error fetching today extraction count:', todayError);
   }
   
-  // Calculate revenue from credit_transactions
+  // Calculate revenue from credit_transactions (admin_add are payments)
   const { data: transactions, error: transactionError } = await supabase
     .from('credit_transactions')
     .select('amount')
-    .eq('transaction_type', 'payment_success');
+    .eq('type', 'admin_add')
+    .gt('amount', 0); // Only positive amounts are revenue
     
   let totalRevenue = 0;
   if (!transactionError && transactions) {
-    totalRevenue = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalCredits = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    // Convert credits to USD (1 USDT = 30 credits)
+    totalRevenue = Math.round((totalCredits / 30) * 100) / 100;
   }
   
   const totalUsers = users.length;

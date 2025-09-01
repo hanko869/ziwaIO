@@ -12,16 +12,20 @@ export async function GET(request: NextRequest) {
 
     // Get statistics
     const stats = await getOverallStatistics();
+    console.log('Stats from getOverallStatistics:', stats);
 
-    return NextResponse.json({
-      totalUsers: stats.totalUsers,
-      activeUsers: stats.activeUsers,
-      totalExtractions: stats.totalExtractions,
-      totalRevenue: stats.totalRevenue || 0, // Use actual revenue from credit_transactions
-      todayActivity: stats.todayActivityCount,
-      successRate: stats.successRate,
-      recentActivities: stats.recentActivities
-    });
+    // Make sure we have valid numbers
+    const response = {
+      totalUsers: stats.totalUsers || 0,
+      activeUsers: stats.activeUsers || 0,
+      totalExtractions: stats.totalExtractions || 0,
+      todayActivity: stats.todayActivityCount || 0,
+      successRate: stats.successRate || '0',
+      recentActivities: stats.recentActivities || []
+    };
+    
+    console.log('Sending response:', response);
+    return NextResponse.json(response);
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     return NextResponse.json(

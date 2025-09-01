@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Users, DollarSign, Activity, Settings, LogOut } from 'lucide-react';
+import { BarChart3, Users, Activity, Settings, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import UserManagement from './UserManagement';
 import ActivityLog from './ActivityLog';
@@ -12,11 +12,11 @@ import CreditManagement from './CreditManagement';
 export default function AdminDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
     totalExtractions: 0,
-    totalRevenue: 0,
     todayActivity: 0
   });
 
@@ -26,13 +26,21 @@ export default function AdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/admin/stats');
       if (response.ok) {
         const data = await response.json();
+        console.log('Admin stats received:', data);
         setStats(data);
+      } else {
+        console.error('Failed to fetch stats:', response.status, response.statusText);
+        const errorData = await response.text();
+        console.error('Error response:', errorData);
       }
     } catch (error) {
       console.error('Failed to fetch stats:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,7 +75,7 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -83,21 +91,12 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Extractions</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalExtractions}</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {loading ? '...' : stats.totalExtractions}
+                </p>
                 <p className="text-xs text-gray-500">All time</p>
               </div>
               <BarChart3 className="h-8 w-8 text-gray-400" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.totalRevenue}</p>
-                <p className="text-xs text-gray-500">Total revenue</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-gray-400" />
             </div>
           </div>
 
