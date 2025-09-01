@@ -34,9 +34,17 @@ export async function POST(request: NextRequest) {
     
     console.log(`Server: Starting bulk extraction with ${availableKeys} API keys for ${urls.length} URLs`);
     
+    // Initialize Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    let supabase = null;
+    
+    if (supabaseUrl && supabaseKey) {
+      supabase = createClient(supabaseUrl, supabaseKey);
+    }
+    
     // Update session if provided
-    if (sessionId && supabaseUrl && supabaseKey) {
-      const supabase = createClient(supabaseUrl, supabaseKey);
+    if (sessionId && supabase) {
       await supabase
         .from('extraction_sessions')
         .update({ status: 'in_progress', processed_urls: 0 })
@@ -71,13 +79,7 @@ export async function POST(request: NextRequest) {
     let totalPhones = 0;
     
     // Save contacts to database if userId provided
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-    let supabase = null;
-    
-    if (supabaseUrl && supabaseKey && userId) {
-      supabase = createClient(supabaseUrl, supabaseKey);
-    }
+    // (Supabase already initialized above)
     
     // Process results and save to database
     let processedIndices: number[] = [];
@@ -154,9 +156,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Update session with final stats if provided
-    if (sessionId && supabaseUrl && supabaseKey && !supabase) {
-      supabase = createClient(supabaseUrl, supabaseKey);
-    }
+    // (Supabase already initialized above)
     
     if (sessionId && supabase) {
       await supabase

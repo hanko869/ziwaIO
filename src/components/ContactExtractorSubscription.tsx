@@ -358,29 +358,45 @@ const ContactExtractorSubscription: React.FC = () => {
       // Create extraction session
       const session = await createSession('bulk', validUrls);
       
-      // Use client-managed concurrency and update real progress per completed URL
-      const concurrency = 6;
       let successCount = 0;
       let failedCount = 0;
-      let processedCount = 0;
       let noContactCount = 0;
       let errorCount = 0;
       const extractedContacts: Contact[] = [];
       setBulkProgress({ current: 0, total: validUrls.length });
 
-      const queue: string[] = [...validUrls];
+      try {
+        // Use the server-side bulk extraction API
+        console.log('Starting server-side bulk extraction for', validUrls.length, 'URLs');
+        
+        const response = await fetch('/api/extract-bulk-simple', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            urls: validUrls,
+            userId: user?.id,
+            sessionId: session?.id
+          })
+        });
 
-      const worker = async () => {
-        while (queue.length > 0) {
-          const url = queue.shift()!;
-          try {
-            const result = await extractContactFromLinkedIn(url, user?.id);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Bulk extraction failed');
+        }
+
+        const data = await response.json();
+        console.log('Bulk extraction response:', data);
+
+        // Process results
+        if (data.results && Array.isArray(data.results)) {
+          data.results.forEach((result: any, index: number) => {
             if (result.success && result.contact) {
               extractedContacts.push(result.contact);
               // Check if contact has any info
-              const hasEmail = result.contact.emails && result.contact.emails.length > 0;
               const hasPhone = result.contact.phones && result.contact.phones.length > 0;
-              if (hasEmail || hasPhone) {
+              if (hasPhone) {
                 successCount++;
               } else {
                 noContactCount++;
@@ -392,29 +408,33 @@ const ContactExtractorSubscription: React.FC = () => {
                 errorCount++;
               }
             }
-          } catch (err) {
-            console.error('Extraction error:', err);
-            failedCount++;
-            errorCount++;
-          } finally {
-            processedCount += 1;
-            setBulkProgress({ current: processedCount, total: validUrls.length });
             
-            // Update session progress
-            if (session && processedCount % 5 === 0) { // Update every 5 URLs
-              await updateSession(session.id, {
-                processed_urls: processedCount,
-                successful_extractions: successCount,
-                failed_extractions: failedCount
-              });
-            }
-          }
+            // Update progress based on server results
+            setBulkProgress({ current: index + 1, total: validUrls.length });
+          });
         }
-      };
 
-      // Launch workers
-      const workers = Array.from({ length: Math.min(concurrency, validUrls.length) }, () => worker());
-      await Promise.all(workers);
+        // Update stats from server response
+        if (data.stats) {
+          successCount = data.stats.successful || successCount;
+          failedCount = data.stats.failed || failedCount;
+        }
+      } catch (error) {
+        console.error('Bulk extraction error:', error);
+        showFeedback('error', error instanceof Error ? error.message : 'Bulk extraction failed');
+        
+        // Mark session as failed
+        if (session) {
+          await updateSession(session.id, {
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+        
+        setIsExtracting(false);
+        setBulkProgress(null);
+        return;
+      }
 
       // Wait a moment for database writes to complete
       await new Promise(resolve => setTimeout(resolve, 500));
