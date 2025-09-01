@@ -58,13 +58,34 @@ export async function POST(request: NextRequest) {
     console.log(`Server: Environment - NODE_ENV: ${process.env.NODE_ENV || 'development'}, VERCEL_ENV: ${process.env.VERCEL_ENV || 'not-vercel'}`);
     
     const extractionStartTime = Date.now();
+    let lastProgressUpdate = Date.now();
+    
     const results = await extractContactsInParallel(urls, {
       // No need to specify maxConcurrent - extractContactsInParallel now optimizes it automatically
       delayBetweenBatches: 0, // No delay for maximum speed
-      onProgress: (completed, total) => {
+      onProgress: async (completed, total) => {
         const elapsed = Date.now() - extractionStartTime;
         const rate = completed / (elapsed / 1000);
         console.log(`Server: Progress ${completed}/${total} (${rate.toFixed(1)} URLs/sec, ${(elapsed/1000).toFixed(1)}s elapsed)`);
+        
+        // Update session progress every 5 completions or every 2 seconds
+        const now = Date.now();
+        if (sessionId && supabase && (completed % 5 === 0 || now - lastProgressUpdate > 2000)) {
+          lastProgressUpdate = now;
+          
+          // Count successful extractions so far
+          let successSoFar = 0;
+          let failedSoFar = 0;
+          
+          await supabase
+            .from('extraction_sessions')
+            .update({
+              processed_urls: completed,
+              successful_extractions: successSoFar,
+              failed_extractions: failedSoFar
+            })
+            .eq('id', sessionId);
+        }
       }
     });
     

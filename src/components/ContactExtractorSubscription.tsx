@@ -369,7 +369,8 @@ const ContactExtractorSubscription: React.FC = () => {
         // Use the server-side bulk extraction API
         console.log('Starting server-side bulk extraction for', validUrls.length, 'URLs');
         
-        const response = await fetch('/api/extract-bulk-simple', {
+        // Start the extraction
+        const extractionPromise = fetch('/api/extract-bulk-simple', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -381,6 +382,38 @@ const ContactExtractorSubscription: React.FC = () => {
           })
         });
 
+        // Poll for progress updates
+        let pollInterval: NodeJS.Timeout | null = null;
+        if (session?.id) {
+          pollInterval = setInterval(async () => {
+            try {
+              const progressResponse = await fetch(`/api/extraction-session/${session.id}`);
+              if (progressResponse.ok) {
+                const progressData = await progressResponse.json();
+                if (progressData.processed_urls !== undefined) {
+                  setBulkProgress({ 
+                    current: progressData.processed_urls, 
+                    total: validUrls.length 
+                  });
+                }
+                
+                // Stop polling if extraction is complete
+                if (progressData.status === 'completed' || progressData.status === 'failed') {
+                  if (pollInterval) clearInterval(pollInterval);
+                }
+              }
+            } catch (error) {
+              console.error('Error polling progress:', error);
+            }
+          }, 1000); // Poll every second
+        }
+
+        // Wait for extraction to complete
+        const response = await extractionPromise;
+        
+        // Stop polling
+        if (pollInterval) clearInterval(pollInterval);
+
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.error || 'Bulk extraction failed');
@@ -391,7 +424,7 @@ const ContactExtractorSubscription: React.FC = () => {
 
         // Process results
         if (data.results && Array.isArray(data.results)) {
-          data.results.forEach((result: any, index: number) => {
+          data.results.forEach((result: any) => {
             if (result.success && result.contact) {
               extractedContacts.push(result.contact);
               // Check if contact has any info
@@ -408,10 +441,10 @@ const ContactExtractorSubscription: React.FC = () => {
                 errorCount++;
               }
             }
-            
-            // Update progress based on server results
-            setBulkProgress({ current: index + 1, total: validUrls.length });
           });
+          
+          // Set final progress
+          setBulkProgress({ current: validUrls.length, total: validUrls.length });
         }
 
         // Update stats from server response
