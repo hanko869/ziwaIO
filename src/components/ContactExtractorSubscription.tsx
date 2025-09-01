@@ -218,8 +218,13 @@ const ContactExtractorSubscription: React.FC = () => {
     setIsExtracting(true);
     showFeedback('info', t.feedback.extracting);
 
-    // Create extraction session
-    const session = await createSession('single', [linkedinUrl]);
+    // Create extraction session (optional, don't fail if it errors)
+    let session = null;
+    try {
+      session = await createSession('single', [linkedinUrl]);
+    } catch (error) {
+      console.log('Session creation failed, continuing without session:', error);
+    }
 
     try {
       const result = await extractContactFromLinkedIn(linkedinUrl, user?.id);
@@ -263,6 +268,15 @@ const ContactExtractorSubscription: React.FC = () => {
           `💰 Credits used: ${creditsUsed}`;
         
         showFeedback('success', successMessage);
+        
+        // Add the contact to the local list
+        setContacts(prevContacts => [result.contact, ...prevContacts]);
+        
+        // Clear the input field
+        setLinkedinUrl('');
+        
+        // Refresh credit balance
+        await fetchCreditBalance();
       } else {
         showFeedback('error', result.error || t.feedback.failedExtract);
       }
@@ -488,8 +502,8 @@ const ContactExtractorSubscription: React.FC = () => {
       // Wait a moment for database writes to complete
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Refresh contacts from database after bulk extraction
-      await fetchContactsFromDatabase();
+      // Add only the new extracted contacts to the list (don't fetch all from DB)
+      setContacts(prevContacts => [...extractedContacts, ...prevContacts]);
       
       // Refresh credit balance
       await fetchCreditBalance();
