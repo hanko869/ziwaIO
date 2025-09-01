@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
-    const { urls, userId, sessionId } = await request.json();
+    const { urls, userId, sessionId, progressId } = await request.json();
     
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
@@ -60,6 +60,21 @@ export async function POST(request: NextRequest) {
     const extractionStartTime = Date.now();
     let lastProgressUpdate = Date.now();
     
+    // Initialize progress tracking
+    if (progressId) {
+      await fetch(new URL('/api/extract-bulk-simple/progress', request.url).toString(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: progressId,
+          total: urls.length,
+          processed: 0,
+          successful: 0,
+          failed: 0
+        })
+      });
+    }
+    
     const results = await extractContactsInParallel(urls, {
       // No need to specify maxConcurrent - extractContactsInParallel now optimizes it automatically
       delayBetweenBatches: 0, // No delay for maximum speed
@@ -68,23 +83,37 @@ export async function POST(request: NextRequest) {
         const rate = completed / (elapsed / 1000);
         console.log(`Server: Progress ${completed}/${total} (${rate.toFixed(1)} URLs/sec, ${(elapsed/1000).toFixed(1)}s elapsed)`);
         
-        // Update session progress every 5 completions or every 2 seconds
+        // Update progress every 5 completions or every 2 seconds
         const now = Date.now();
-        if (sessionId && supabase && (completed % 5 === 0 || now - lastProgressUpdate > 2000)) {
+        if (completed % 5 === 0 || now - lastProgressUpdate > 2000) {
           lastProgressUpdate = now;
           
-          // Count successful extractions so far
-          let successSoFar = 0;
-          let failedSoFar = 0;
+          // Update progress tracking
+          if (progressId) {
+            await fetch(new URL('/api/extract-bulk-simple/progress', request.url).toString(), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: progressId,
+                total: urls.length,
+                processed: completed,
+                successful: 0, // Will be updated later
+                failed: 0 // Will be updated later
+              })
+            });
+          }
           
-          await supabase
-            .from('extraction_sessions')
-            .update({
-              processed_urls: completed,
-              successful_extractions: successSoFar,
-              failed_extractions: failedSoFar
-            })
-            .eq('id', sessionId);
+          // Update session progress if available
+          if (sessionId && supabase) {
+            await supabase
+              .from('extraction_sessions')
+              .update({
+                processed_urls: completed,
+                successful_extractions: 0,
+                failed_extractions: 0
+              })
+              .eq('id', sessionId);
+          }
         }
       }
     });

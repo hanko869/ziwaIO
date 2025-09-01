@@ -355,10 +355,15 @@ const ContactExtractorSubscription: React.FC = () => {
 
       setIsExtracting(true);
       
-      // Create extraction session
+      // Create extraction session (skip if it fails)
       console.log('Creating extraction session for', validUrls.length, 'URLs');
-      const session = await createSession('bulk', validUrls);
-      console.log('Created session:', session);
+      let session = null;
+      try {
+        session = await createSession('bulk', validUrls);
+        console.log('Created session:', session);
+      } catch (error) {
+        console.log('Session creation failed, continuing without session tracking:', error);
+      }
       
       let successCount = 0;
       let failedCount = 0;
@@ -371,6 +376,9 @@ const ContactExtractorSubscription: React.FC = () => {
         // Use the server-side bulk extraction API
         console.log('Starting server-side bulk extraction for', validUrls.length, 'URLs');
         
+        // Generate a unique progress ID
+        const progressId = `progress-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
         // Start the extraction
         const extractionPromise = fetch('/api/extract-bulk-simple', {
           method: 'POST',
@@ -380,41 +388,41 @@ const ContactExtractorSubscription: React.FC = () => {
           body: JSON.stringify({
             urls: validUrls,
             userId: user?.id,
-            sessionId: session?.id
+            sessionId: session?.id,
+            progressId: progressId
           })
         });
 
         // Poll for progress updates
         let pollInterval: NodeJS.Timeout | null = null;
-        if (session?.id) {
-          console.log('Starting progress polling for session:', session.id);
-          pollInterval = setInterval(async () => {
-            try {
-              const progressResponse = await fetch(`/api/extraction-session/${session.id}`);
-              if (progressResponse.ok) {
-                const progressData = await progressResponse.json();
-                console.log('Progress update:', progressData);
-                if (progressData.processed_urls !== undefined) {
-                  setBulkProgress({ 
-                    current: progressData.processed_urls, 
-                    total: validUrls.length 
-                  });
-                }
-                
-                // Stop polling if extraction is complete
-                if (progressData.status === 'completed' || progressData.status === 'failed') {
-                  if (pollInterval) clearInterval(pollInterval);
-                }
-              } else {
-                console.error('Progress response not ok:', progressResponse.status);
+        
+        // Use progress ID for polling
+        console.log('Starting progress polling with ID:', progressId);
+        pollInterval = setInterval(async () => {
+          try {
+            // Try the new progress endpoint first
+            const progressResponse = await fetch(`/api/extract-bulk-simple/progress?id=${progressId}`);
+            if (progressResponse.ok) {
+              const progressData = await progressResponse.json();
+              console.log('Progress update:', progressData);
+              if (progressData.processed !== undefined) {
+                setBulkProgress({ 
+                  current: progressData.processed, 
+                  total: progressData.total || validUrls.length 
+                });
               }
-            } catch (error) {
-              console.error('Error polling progress:', error);
+              
+              // Stop polling if extraction is complete
+              if (progressData.status === 'completed') {
+                if (pollInterval) clearInterval(pollInterval);
+              }
+            } else {
+              console.error('Progress response not ok:', progressResponse.status);
             }
-          }, 1000); // Poll every second
-        } else {
-          console.log('No session ID, skipping progress polling');
-        }
+          } catch (error) {
+            console.error('Error polling progress:', error);
+          }
+        }, 1000); // Poll every second
 
         // Wait for extraction to complete
         const response = await extractionPromise;
