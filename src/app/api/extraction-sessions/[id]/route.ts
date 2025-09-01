@@ -9,7 +9,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const sessionId = params.id;
+    const { id } = params;
     const updates = await request.json();
     
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -17,8 +17,11 @@ export async function PATCH(
     // Update extraction session
     const { data, error } = await supabase
       .from('extraction_sessions')
-      .update(updates)
-      .eq('id', sessionId)
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
       .select()
       .single();
     
@@ -45,18 +48,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const sessionId = params.id;
+    const { id } = params;
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Cancel extraction session (mark as cancelled)
+    // Update status to cancelled
     const { error } = await supabase
       .from('extraction_sessions')
-      .update({ 
+      .update({
         status: 'cancelled',
-        completed_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
       })
-      .eq('id', sessionId);
+      .eq('id', id);
     
     if (error) {
       console.error('Error cancelling extraction session:', error);

@@ -356,7 +356,9 @@ const ContactExtractorSubscription: React.FC = () => {
       setIsExtracting(true);
       
       // Create extraction session
+      console.log('Creating extraction session for', validUrls.length, 'URLs');
       const session = await createSession('bulk', validUrls);
+      console.log('Created session:', session);
       
       let successCount = 0;
       let failedCount = 0;
@@ -385,11 +387,13 @@ const ContactExtractorSubscription: React.FC = () => {
         // Poll for progress updates
         let pollInterval: NodeJS.Timeout | null = null;
         if (session?.id) {
+          console.log('Starting progress polling for session:', session.id);
           pollInterval = setInterval(async () => {
             try {
               const progressResponse = await fetch(`/api/extraction-session/${session.id}`);
               if (progressResponse.ok) {
                 const progressData = await progressResponse.json();
+                console.log('Progress update:', progressData);
                 if (progressData.processed_urls !== undefined) {
                   setBulkProgress({ 
                     current: progressData.processed_urls, 
@@ -401,11 +405,15 @@ const ContactExtractorSubscription: React.FC = () => {
                 if (progressData.status === 'completed' || progressData.status === 'failed') {
                   if (pollInterval) clearInterval(pollInterval);
                 }
+              } else {
+                console.error('Progress response not ok:', progressResponse.status);
               }
             } catch (error) {
               console.error('Error polling progress:', error);
             }
           }, 1000); // Poll every second
+        } else {
+          console.log('No session ID, skipping progress polling');
         }
 
         // Wait for extraction to complete
