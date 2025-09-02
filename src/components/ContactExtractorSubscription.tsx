@@ -785,11 +785,7 @@ const ContactExtractorSubscription: React.FC = () => {
               {bulkProgress && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>
-                      {bulkProgress.current >= bulkProgress.total 
-                        ? 'Saving contacts to database...' 
-                        : t.extraction.bulkUpload.processing}
-                    </span>
+                    <span>{t.extraction.bulkUpload.processing}</span>
                     <span>{bulkProgress.current} / {bulkProgress.total}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2.5">

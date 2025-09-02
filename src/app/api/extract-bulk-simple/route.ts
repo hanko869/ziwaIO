@@ -139,7 +139,6 @@ export async function POST(request: NextRequest) {
     let noContactErrors = 0;
     let otherErrors = 0;
     
-    let saveCount = 0;
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success && result.contact) {
@@ -152,38 +151,8 @@ export async function POST(request: NextRequest) {
         totalPhones += phoneCount;
         creditsUsed += (emailCount * 1) + (phoneCount * 2);
         
-        // Save to database if we have supabase client and userId
-        if (supabase && userId) {
-          try {
-            const { data: savedContact, error } = await supabase
-              .from('extracted_contacts')
-              .insert({
-                user_id: userId,
-                linkedin_url: result.contact.linkedinUrl,
-                name: result.contact.name,
-                emails: result.contact.emails || [],
-                phones: result.contact.phones || [],
-                job_title: result.contact.jobTitle,
-                company: result.contact.company,
-                location: result.contact.location,
-                credits_used: (emailCount * 1) + (phoneCount * 2),
-                extracted_at: new Date().toISOString()
-              })
-              .select()
-              .single();
-              
-            if (error) {
-              console.error('Error saving contact to database:', error);
-            } else {
-              console.log('Contact saved successfully:', savedContact?.id, savedContact?.name);
-            }
-          } catch (dbError) {
-            console.error('Database save error:', dbError);
-          }
-        }
-        
-        // Update save count
-        saveCount++;
+        // Skip database saving for bulk extractions - users download immediately
+        // Database saving was causing unnecessary delays
       } else {
         // Count error types
         if (result.error?.includes('Service temporarily unavailable')) {
@@ -198,18 +167,7 @@ export async function POST(request: NextRequest) {
     
     console.log(`Extraction Summary: ${successCount} successful, ${serviceErrors} service errors, ${noContactErrors} no contact info, ${otherErrors} other errors`);
     
-    // Update progress to show saving status
-    if (progressId) {
-      const currentProgress = progressStore.get(progressId);
-      if (currentProgress) {
-        progressStore.set(progressId, {
-          ...currentProgress,
-          status: 'saving' as any, // Custom status to show saving phase
-          lastUpdate: Date.now()
-        });
-        console.log('Progress status updated to: saving');
-      }
-    }
+
     
     // Update final progress
     if (progressId) {
