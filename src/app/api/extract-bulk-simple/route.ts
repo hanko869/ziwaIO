@@ -102,18 +102,17 @@ export async function POST(request: NextRequest) {
             });
           }
         }
-          
-          // Update session progress if available
-          if (sessionId && supabase) {
-            await supabase
-              .from('extraction_sessions')
-              .update({
-                processed_urls: completed,
-                successful_extractions: 0,
-                failed_extractions: 0
-              })
-              .eq('id', sessionId);
-          }
+        
+        // Update session progress if available
+        if (sessionId && supabase) {
+          await supabase
+            .from('extraction_sessions')
+            .update({
+              processed_urls: completed,
+              successful_extractions: 0,
+              failed_extractions: 0
+            })
+            .eq('id', sessionId);
         }
       }
     });
