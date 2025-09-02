@@ -3,16 +3,7 @@ import { extractContactsInParallel } from '@/utils/parallelExtraction';
 import { initializeApiKeys } from '@/utils/apiKeyLoader';
 import { getApiKeyPool } from '@/utils/apiKeyPool';
 import { createClient } from '@supabase/supabase-js';
-
-// Shared progress store
-export const progressStore = new Map<string, {
-  total: number;
-  processed: number;
-  successful: number;
-  failed: number;
-  lastUpdate: number;
-  status: 'in_progress' | 'completed' | 'failed';
-}>();
+import { progressStore } from '@/utils/progressStore';
 
 export async function POST(request: NextRequest) {
   try {

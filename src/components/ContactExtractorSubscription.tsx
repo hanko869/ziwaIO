@@ -419,12 +419,17 @@ const ContactExtractorSubscription: React.FC = () => {
             if (progressResponse.ok) {
               const progressData = await progressResponse.json();
               console.log('Progress update:', progressData);
-              if (progressData.processed !== undefined) {
-                setBulkProgress({ 
-                  current: progressData.processed, 
-                  total: progressData.total || validUrls.length 
-                });
+              
+              // Only update progress if we have valid data (not pending/not_found)
+              if (progressData.status !== 'pending' && progressData.status !== 'not_found') {
+                if (progressData.processed !== undefined && progressData.total > 0) {
+                  setBulkProgress({ 
+                    current: progressData.processed, 
+                    total: progressData.total || validUrls.length 
+                  });
+                }
               }
+              // If pending, keep the existing progress (don't reset to 0)
               
               // Stop polling if extraction is complete
               if (progressData.status === 'completed') {

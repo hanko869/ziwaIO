@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { progressStore } from '../route';
-
-// Clean up old progress data (older than 1 hour)
-function cleanupOldProgress() {
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  for (const [id, progress] of progressStore.entries()) {
-    if (progress.lastUpdate < oneHourAgo) {
-      progressStore.delete(id);
-    }
-  }
-}
+import { progressStore } from '@/utils/progressStore';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -19,24 +9,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Progress ID required' }, { status: 400 });
   }
   
-  cleanupOldProgress();
+  // Don't cleanup during active extraction
+  // cleanupOldProgress();
   
   const progress = progressStore.get(progressId);
   if (!progress) {
+    // Don't return 0s immediately - this might be a new serverless instance
+    // Return a "pending" state instead
     return NextResponse.json({ 
       id: progressId,
       total: 0,
       processed: 0,
       successful: 0,
       failed: 0,
-      status: 'not_found'
+      status: 'pending' // Changed from 'not_found' to 'pending'
     });
   }
   
   return NextResponse.json({
     id: progressId,
     ...progress,
-    status: progress.processed >= progress.total ? 'completed' : 'in_progress'
+    status: progress.status || (progress.processed >= progress.total ? 'completed' : 'in_progress')
   });
 }
 
@@ -55,8 +48,6 @@ export async function POST(request: NextRequest) {
     lastUpdate: Date.now(),
     status: 'in_progress'
   });
-  
-  cleanupOldProgress();
   
   return NextResponse.json({ success: true });
 }
