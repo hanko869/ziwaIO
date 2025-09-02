@@ -423,14 +423,11 @@ const ContactExtractorSubscription: React.FC = () => {
               // Only update progress if we have valid data (not pending/not_found)
               if (progressData.status !== 'pending' && progressData.status !== 'not_found') {
                 if (progressData.processed !== undefined && progressData.total > 0) {
-                  console.log('Setting bulk progress:', progressData.processed, '/', progressData.total);
                   setBulkProgress({ 
                     current: progressData.processed, 
                     total: progressData.total || validUrls.length 
                   });
                 }
-              } else {
-                console.log('Progress status is pending/not_found, keeping existing progress');
               }
               // If pending, keep the existing progress (don't reset to 0)
               

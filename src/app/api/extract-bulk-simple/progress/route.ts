@@ -5,44 +5,34 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const progressId = searchParams.get('id');
   
-  console.log('[Progress GET] Request for ID:', progressId);
-  
   if (!progressId) {
     return NextResponse.json({ error: 'Progress ID required' }, { status: 400 });
   }
   
-  // Don't cleanup during active extraction
-  // cleanupOldProgress();
-  
   const progress = progressStore.get(progressId);
-  console.log('[Progress GET] Found progress:', progress);
   
   if (!progress) {
-    // Don't return 0s immediately - this might be a new serverless instance
-    // Return a "pending" state instead
-    console.log('[Progress GET] No progress found, returning pending state');
+    // Return pending state if progress not found
     return NextResponse.json({ 
       id: progressId,
       total: 0,
       processed: 0,
       successful: 0,
       failed: 0,
-      status: 'pending' // Changed from 'not_found' to 'pending'
+      started: 0,
+      status: 'pending'
     });
   }
   
-  const response = {
+  return NextResponse.json({
     id: progressId,
     ...progress,
     status: progress.status || (progress.processed >= progress.total ? 'completed' : 'in_progress')
-  };
-  console.log('[Progress GET] Returning progress:', response);
-  
-  return NextResponse.json(response);
+  });
 }
 
 export async function POST(request: NextRequest) {
-  const { id, total, processed, successful, failed } = await request.json();
+  const { id, total, processed, successful, failed, started } = await request.json();
   
   if (!id) {
     return NextResponse.json({ error: 'Progress ID required' }, { status: 400 });
@@ -53,6 +43,7 @@ export async function POST(request: NextRequest) {
     processed: processed || 0,
     successful: successful || 0,
     failed: failed || 0,
+    started: started || 0,
     lastUpdate: Date.now(),
     status: 'in_progress'
   });

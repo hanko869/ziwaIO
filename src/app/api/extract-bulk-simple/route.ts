@@ -73,22 +73,15 @@ export async function POST(request: NextRequest) {
         status: 'in_progress' as const
       };
       progressStore.set(progressId, initialProgress);
-      console.log('Initialized progress tracking for:', progressId, 'with data:', initialProgress);
-      
-      // Verify it was set
-      const verifyProgress = progressStore.get(progressId);
-      console.log('Verified progress after setting:', verifyProgress);
-    } else {
-      console.log('WARNING: No progressId provided!');
+      console.log('Initialized progress tracking for:', progressId);
     }
     
-    // Calculate optimal concurrency explicitly
-    // Use a lower concurrency for smoother progress updates while maintaining good speed
-    const optimalConcurrency = Math.min(availableKeys * 5, 50);
-    console.log(`Server: Using ${optimalConcurrency} concurrent requests (${availableKeys} keys * 5 multiplier, max 50)`);
+    // Calculate optimal concurrency explicitly - SPEED IS PRIORITY
+    const optimalConcurrency = Math.min(availableKeys * 10, 100);
+    console.log(`Server: Using ${optimalConcurrency} concurrent requests (${availableKeys} keys * 10 multiplier, max 100)`);
     
     const results = await extractContactsInParallel(urls, {
-      maxConcurrent: optimalConcurrency, // Explicitly set concurrency
+      maxConcurrent: optimalConcurrency, // Explicitly set concurrency for maximum speed
       delayBetweenBatches: 0, // No delay for maximum speed
       onProgress: async (completed, total) => {
         const elapsed = Date.now() - extractionStartTime;
@@ -98,17 +91,12 @@ export async function POST(request: NextRequest) {
         // Update progress tracking - report actual completed count
         if (progressId) {
           const currentProgress = progressStore.get(progressId);
-          console.log(`[onProgress] Current progress for ${progressId}:`, currentProgress);
           if (currentProgress) {
-            const updatedProgress = {
+            progressStore.set(progressId, {
               ...currentProgress,
               processed: completed,
               lastUpdate: Date.now()
-            };
-            progressStore.set(progressId, updatedProgress);
-            console.log(`[onProgress] Updated progress for ${progressId}:`, updatedProgress);
-          } else {
-            console.log(`[onProgress] WARNING: No progress found for ${progressId}`);
+            });
           }
         }
         
