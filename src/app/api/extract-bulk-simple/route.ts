@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         const rate = completed / (elapsed / 1000);
         console.log(`Server: Progress ${completed}/${total} (${rate.toFixed(1)} URLs/sec, ${(elapsed/1000).toFixed(1)}s elapsed)`);
         
-        // Update progress tracking - report actual completed count
+        // Update progress tracking
         if (progressId) {
           const currentProgress = progressStore.get(progressId);
           if (currentProgress) {
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
             });
             // Log only key milestones
             if (completed === 1 || completed % 50 === 0 || completed === total) {
-              console.log(`Progress stored: ${completed}/${total} for ID: ${progressId}`);
+              console.log(`Extraction progress: ${completed}/${total} for ID: ${progressId}`);
             }
           } else {
             console.warn(`No progress found for ID: ${progressId} when trying to update`);
@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
     let noContactErrors = 0;
     let otherErrors = 0;
     
+    let saveCount = 0;
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.success && result.contact) {
@@ -180,6 +181,9 @@ export async function POST(request: NextRequest) {
             console.error('Database save error:', dbError);
           }
         }
+        
+        // Update save count
+        saveCount++;
       } else {
         // Count error types
         if (result.error?.includes('Service temporarily unavailable')) {
@@ -193,6 +197,19 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`Extraction Summary: ${successCount} successful, ${serviceErrors} service errors, ${noContactErrors} no contact info, ${otherErrors} other errors`);
+    
+    // Update progress to show saving status
+    if (progressId) {
+      const currentProgress = progressStore.get(progressId);
+      if (currentProgress) {
+        progressStore.set(progressId, {
+          ...currentProgress,
+          status: 'saving' as any, // Custom status to show saving phase
+          lastUpdate: Date.now()
+        });
+        console.log('Progress status updated to: saving');
+      }
+    }
     
     // Update final progress
     if (progressId) {
