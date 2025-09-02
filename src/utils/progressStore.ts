@@ -6,6 +6,7 @@ interface ProgressData {
   processed: number;
   successful: number;
   failed: number;
+  started: number; // Add tracking for started tasks
   lastUpdate: number;
   status: 'in_progress' | 'completed' | 'failed' | 'pending';
 }
