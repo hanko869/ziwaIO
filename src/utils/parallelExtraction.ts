@@ -243,8 +243,8 @@ export async function extractContactsInParallel(
   console.log(`  - Calculated Concurrency: ${optimalConcurrency} parallel requests`);
   
   const queue = new ParallelExtractionQueue({
-    maxConcurrent: optimalConcurrency,
-    ...options
+    ...options,
+    maxConcurrent: options?.maxConcurrent || optimalConcurrency, // Use provided maxConcurrent or calculated value
   });
 
   queue.addUrls(urls);

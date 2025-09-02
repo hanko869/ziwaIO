@@ -74,8 +74,12 @@ export async function POST(request: NextRequest) {
       console.log('Initialized progress tracking for:', progressId);
     }
     
+    // Calculate optimal concurrency explicitly
+    const optimalConcurrency = Math.min(availableKeys * 10, 100);
+    console.log(`Server: Using ${optimalConcurrency} concurrent requests (${availableKeys} keys * 10 multiplier, max 100)`);
+    
     const results = await extractContactsInParallel(urls, {
-      // No need to specify maxConcurrent - extractContactsInParallel now optimizes it automatically
+      maxConcurrent: optimalConcurrency, // Explicitly set concurrency
       delayBetweenBatches: 0, // No delay for maximum speed
       onProgress: async (completed, total) => {
         const elapsed = Date.now() - extractionStartTime;
