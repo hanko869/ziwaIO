@@ -91,23 +91,17 @@ export async function POST(request: NextRequest) {
         const rate = completed / (elapsed / 1000);
         console.log(`Server: Progress ${completed}/${total} (${rate.toFixed(1)} URLs/sec, ${(elapsed/1000).toFixed(1)}s elapsed)`);
         
-        // Update progress every 5 completions or every 2 seconds
-        const now = Date.now();
-        if (completed % 5 === 0 || now - lastProgressUpdate > 2000) {
-          lastProgressUpdate = now;
-          
-          // Update progress tracking
-          if (progressId) {
-            const currentProgress = progressStore.get(progressId);
-            if (currentProgress) {
-              progressStore.set(progressId, {
-                ...currentProgress,
-                processed: completed,
-                lastUpdate: Date.now()
-              });
-              console.log(`Progress update: ${progressId} - ${completed}/${total}`);
-            }
+        // Update progress tracking immediately for better real-time updates
+        if (progressId) {
+          const currentProgress = progressStore.get(progressId);
+          if (currentProgress) {
+            progressStore.set(progressId, {
+              ...currentProgress,
+              processed: completed,
+              lastUpdate: Date.now()
+            });
           }
+        }
           
           // Update session progress if available
           if (sessionId && supabase) {

@@ -171,7 +171,7 @@ export class ParallelExtractionQueue {
         console.log(`📊 Progress: ${this.completed}/${this.tasks.length} (${((this.completed / this.tasks.length) * 100).toFixed(1)}%) - Last 10 avg: ${duration}ms`);
       }
 
-      // Report progress
+      // Report progress on every completion for accurate tracking
       if (this.options.onProgress) {
         this.options.onProgress(this.completed, this.tasks.length);
       }
@@ -226,11 +226,11 @@ export async function extractContactsInParallel(
   const keyStats = apiKeyPool?.getAllKeysStatus();
   console.log('API Key Usage Before Extraction:', keyStats);
   
-  // Optimize concurrency based on number of API keys and environment
-  // Production environments may have different limits than local
+  // Optimize concurrency based on number of API keys
+  // Use same aggressive settings for both local and production
   const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
-  const baseMultiplier = isProduction ? 5 : 10; // More conservative in production
-  const maxConcurrent = isProduction ? 50 : 100; // Lower cap for production stability
+  const baseMultiplier = 10; // Same multiplier for both environments
+  const maxConcurrent = 100; // Same cap for both environments
   
   const optimalConcurrency = Math.min(availableKeys * baseMultiplier, maxConcurrent);
   console.log(`⚡ Parallel Extraction Configuration:`);
