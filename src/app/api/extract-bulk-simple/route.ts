@@ -97,6 +97,12 @@ export async function POST(request: NextRequest) {
               processed: completed,
               lastUpdate: Date.now()
             });
+            // Log only key milestones
+            if (completed === 1 || completed % 50 === 0 || completed === total) {
+              console.log(`Progress stored: ${completed}/${total} for ID: ${progressId}`);
+            }
+          } else {
+            console.warn(`No progress found for ID: ${progressId} when trying to update`);
           }
         }
         

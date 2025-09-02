@@ -12,6 +12,10 @@ export async function GET(request: NextRequest) {
   const progress = progressStore.get(progressId);
   
   if (!progress) {
+    // Log when progress not found (only once per ID to avoid spam)
+    if (!progressId.includes('logged')) {
+      console.log(`Progress GET: No progress found for ID: ${progressId}`);
+    }
     // Return pending state if progress not found
     return NextResponse.json({ 
       id: progressId,
@@ -22,6 +26,11 @@ export async function GET(request: NextRequest) {
       started: 0,
       status: 'pending'
     });
+  }
+  
+  // Log progress retrieval occasionally
+  if (progress.processed === 1 || progress.processed % 50 === 0) {
+    console.log(`Progress GET: Found ${progress.processed}/${progress.total} for ID: ${progressId}`);
   }
   
   return NextResponse.json({

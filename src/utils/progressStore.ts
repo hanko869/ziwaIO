@@ -1,29 +1,21 @@
 // Global progress store that persists across serverless function invocations
-// This uses a singleton pattern to ensure the same instance is used
+// Uses global to ensure persistence in Next.js dev mode
 
 interface ProgressData {
   total: number;
   processed: number;
   successful: number;
   failed: number;
-  started: number; // Add tracking for started tasks
+  started: number;
   lastUpdate: number;
   status: 'in_progress' | 'completed' | 'failed' | 'pending';
 }
 
 class ProgressStore {
-  private static instance: ProgressStore;
   private store: Map<string, ProgressData>;
   
-  private constructor() {
+  constructor() {
     this.store = new Map();
-  }
-  
-  static getInstance(): ProgressStore {
-    if (!ProgressStore.instance) {
-      ProgressStore.instance = new ProgressStore();
-    }
-    return ProgressStore.instance;
   }
   
   set(id: string, data: ProgressData): void {
@@ -52,8 +44,18 @@ class ProgressStore {
   }
 }
 
-// Export a singleton instance
-export const progressStore = ProgressStore.getInstance();
+// Use global to persist across module reloads in development
+declare global {
+  var _progressStore: ProgressStore | undefined;
+}
+
+// Create or reuse the global instance
+if (!global._progressStore) {
+  global._progressStore = new ProgressStore();
+}
+
+// Export the global instance
+export const progressStore = global._progressStore;
 
 // Also export the type for use in other files
 export type { ProgressData };
