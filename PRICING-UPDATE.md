@@ -4,7 +4,7 @@
 
 ### 📱 **Phone Number Cost:**
 - **Target Price:** $0.0245 per phone number  
-- **Credits Required:** 1 credit per phone
+- **Credits Required:** 2 credits per phone
 - **Actual Cost:** $0.0244 per phone (rounded)
 
 ### 📧 **Email Cost:**
@@ -14,23 +14,23 @@
 ## 🏦 **Credit System:**
 
 ### 💳 **Purchase Rates:**
-- **41 credits = 1 USDT**
-- **Minimum deposit:** 10 USDT = 410 credits
+- **82 credits = 1 USDT**
+- **Minimum deposit:** 10 USDT = 820 credits
 
 ### 🧮 **Calculation:**
 ```
-1 USDT ÷ 41 credits = $0.0244 per credit
-1 phone = 1 credit = $0.0244
+1 USDT ÷ 82 credits = $0.0122 per credit
+1 phone = 2 credits = $0.0244
 ```
 
 ## 📊 **Cost Examples:**
 
 | Extraction Result | Credits | Cost (USDT) | Cost (USD) |
 |-------------------|---------|-------------|------------|
-| 1 phone only | 1 credit | $0.0244 | ~2.4¢ |
-| 2 phones | 2 credits | $0.0488 | ~4.9¢ |
-| 1 email + 1 phone | 1 credit | $0.0244 | ~2.4¢ |
-| 10 phones | 10 credits | $0.244 | ~24¢ |
+| 1 phone only | 2 credits | $0.0244 | ~2.4¢ |
+| 2 phones | 4 credits | $0.0488 | ~4.9¢ |
+| 1 email + 1 phone | 2 credits | $0.0244 | ~2.4¢ |
+| 10 phones | 20 credits | $0.244 | ~24¢ |
 
 ## 🎉 **Benefits:**
 - ✅ **63% cheaper** than before ($0.067 → $0.0244)
@@ -41,8 +41,8 @@
 ## ⚙️ **Environment Variables:**
 ```
 NEXT_PUBLIC_CREDITS_PER_EMAIL=1
-NEXT_PUBLIC_CREDITS_PER_PHONE=1
-NEXT_PUBLIC_CREDITS_PER_USDT=41
+NEXT_PUBLIC_CREDITS_PER_PHONE=2
+NEXT_PUBLIC_CREDITS_PER_USDT=82
 NEXT_PUBLIC_MIN_DEPOSIT_USDT=10
 ```
 
