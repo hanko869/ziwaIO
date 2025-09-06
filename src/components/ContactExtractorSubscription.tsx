@@ -268,15 +268,6 @@ const ContactExtractorSubscription: React.FC = () => {
           `💰 Credits used: ${creditsUsed}`;
         
         showFeedback('success', successMessage);
-        
-        // Add the contact to the local list
-        setContacts(prevContacts => [result.contact, ...prevContacts]);
-        
-        // Clear the input field
-        setLinkedinUrl('');
-        
-        // Refresh credit balance
-        await fetchCreditBalance();
       } else {
         showFeedback('error', result.error || t.feedback.failedExtract);
       }
