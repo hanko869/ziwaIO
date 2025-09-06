@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
