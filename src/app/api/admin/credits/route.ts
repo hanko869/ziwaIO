@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       .from('credit_transactions')
       .insert({
         user_id: userId,
-        type: action === 'add' ? 'admin_add' : 'admin_adjust',
+        type: action === 'add' ? 'bonus' : 'refund',
         amount: action === 'add' ? amount : (newBalance - currentBalance),
         balance_after: newBalance,
         description: transactionDescription,

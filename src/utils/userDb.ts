@@ -224,11 +224,11 @@ export const getOverallStatistics = async () => {
     console.error('Error fetching today extraction count:', todayError);
   }
   
-  // Calculate revenue from credit_transactions (admin_add are payments)
+  // Calculate revenue from credit_transactions (purchase are payments)
   const { data: transactions, error: transactionError } = await supabase
     .from('credit_transactions')
     .select('amount')
-    .eq('type', 'admin_add')
+    .eq('type', 'purchase')
     .gt('amount', 0); // Only positive amounts are revenue
     
   let totalRevenue = 0;
