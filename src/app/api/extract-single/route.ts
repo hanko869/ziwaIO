@@ -122,14 +122,14 @@ export async function POST(request: NextRequest) {
         const supabase = createClient(supabaseUrl, supabaseKey);
         try {
           const { error } = await supabase
-            .from('extracted_contacts')
+            .from('contacts')
             .insert({
               user_id: userId,
               linkedin_url: result.contact.linkedinUrl,
               name: result.contact.name,
               emails: [],
               phones: result.contact.phones || [],
-              job_title: result.contact.jobTitle,
+              title: result.contact.jobTitle,
               company: result.contact.company,
               location: result.contact.location,
               credits_used: creditsToDeduct,

@@ -3,6 +3,12 @@ const bcrypt = require('bcryptjs');
 async function generateHashes() {
   console.log('Generating password hashes...\n');
   
+  // Generate hash for requested password
+  const requestedHash = await bcrypt.hash('Qq221122?@', 10);
+  console.log('Password: Qq221122?@');
+  console.log('Hash:', requestedHash);
+  console.log('');
+  
   // Generate hash for admin123
   const adminHash = await bcrypt.hash('admin123', 10);
   console.log('Password: admin123');

@@ -72,7 +72,7 @@ const ContactExtractorSubscription: React.FC = () => {
           emails: dbContact.emails || [],
           phones: dbContact.phones || [],
           extractedAt: dbContact.extracted_at,
-          jobTitle: dbContact.job_title,
+          jobTitle: dbContact.title,
           company: dbContact.company,
           location: dbContact.location
         }));
@@ -1240,22 +1240,6 @@ function PaymentModal({ userId, onClose, onPaymentComplete }: {
           </div>
         </div>
       </div>
-      
-      {/* Navigation Warning Dialog */}
-      <ExtractionWarningDialog
-        isOpen={showNavigationWarning}
-        onConfirm={() => {
-          if (pendingNavigation) {
-            pendingNavigation();
-          }
-          setShowNavigationWarning(false);
-        }}
-        onCancel={() => {
-          setShowNavigationWarning(false);
-          setPendingNavigation(null);
-        }}
-        progress={bulkProgress}
-      />
     </div>
   );
 }

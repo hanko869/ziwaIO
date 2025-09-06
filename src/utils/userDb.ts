@@ -198,24 +198,24 @@ export const getOverallStatistics = async () => {
     // Continue with empty arrays if there's an error
   }
   
-  // Get total extractions by counting rows in extracted_contacts
+  // Get total extractions by counting rows in contacts
   const { count: totalExtractions, error: extractionError } = await supabase
-    .from('extracted_contacts')
+    .from('contacts')
     .select('*', { count: 'exact', head: true });
     
-  console.log('Total extractions from extracted_contacts:', totalExtractions);
+  console.log('Total extractions from contacts:', totalExtractions);
   if (extractionError) {
     console.error('Error fetching extraction count:', extractionError);
   }
   
-  // Get today's extractions directly from extracted_contacts
+  // Get today's extractions directly from contacts
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   
   const { count: todayExtractions, error: todayError } = await supabase
-    .from('extracted_contacts')
+    .from('contacts')
     .select('*', { count: 'exact', head: true })
     .gte('extracted_at', today.toISOString())
     .lt('extracted_at', tomorrow.toISOString());

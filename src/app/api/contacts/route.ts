@@ -39,19 +39,16 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('extracted_contacts')
+      .from('contacts')
       .insert({
         user_id: userId,
         linkedin_url: linkedinUrl,
         name,
         emails,
         phones,
-        job_title: jobTitle,
+        title: jobTitle,
         company,
-        location,
-        education,
-        credits_used: creditsUsed || 1,
-        raw_data: rawData
+        location
       })
       .select()
       .single();
@@ -86,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error, count } = await supabase
-      .from('extracted_contacts')
+      .from('contacts')
       .select('*', { count: 'exact' })
       .eq('user_id', userId)
       .order('extracted_at', { ascending: false })
@@ -124,7 +121,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from('extracted_contacts')
+      .from('contacts')
       .delete()
       .eq('user_id', userId);
 
