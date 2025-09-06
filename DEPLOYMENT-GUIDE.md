@@ -61,8 +61,8 @@ Before deploying, you need to configure NOWPayments for production:
    JWT_SECRET=supersecretjwtkey123456789abcdefghijklmnopqrstuvwxyz
    
    NEXT_PUBLIC_CREDITS_PER_EMAIL=1
-   NEXT_PUBLIC_CREDITS_PER_PHONE=2
-   NEXT_PUBLIC_CREDITS_PER_USDT=30
+   NEXT_PUBLIC_CREDITS_PER_PHONE=1
+   NEXT_PUBLIC_CREDITS_PER_USDT=41
    NEXT_PUBLIC_MIN_DEPOSIT_USDT=10
    
    ADMIN_USERNAME=rag26
