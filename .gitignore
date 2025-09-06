@@ -1,0 +1,28 @@
+.vercel
+
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Env files
+.env
+.env.*
+.env.local
+.env.production
+linkedin-contact-extractor/.env*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Misc
+.DS_Store
+.turbo
+
+# Exclude the other project (different repo)
+linkedin-extractor-for-ziwa/
